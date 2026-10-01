@@ -1,0 +1,23 @@
+node_modules/
+npm-debug.log*
+.DS_Store
+.env
+*.env
+
+files/
+PS4Games/
+PS5Games/
+
+src/public/ps5-relapse/
+
+# Ignore downloaded game covers/thumbnails
+src/public/images/*
+src/public/thumbnail/*
+
+# Keep folders in git
+!src/public/images/.gitkeep
+!src/public/thumbnail/.gitkeep
+
+# Optional local backups
+BACKUP/
+screenshots/
