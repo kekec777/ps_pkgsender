@@ -674,9 +674,82 @@
     }
   </style>
 
+
+  <style id="pkgsender-main-back-nav-style">
+    .console-switch-bar {
+      width: 100%;
+    }
+
+    .console-switch-actions .btn i {
+      pointer-events: none;
+    }
+  </style>
+
+
+  <style id="pkgsender-nav-even-button-fix">
+    .console-switch-actions .btn {
+      min-height: 34px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      white-space: nowrap;
+      border-radius: 999px;
+      font-weight: 950;
+    }
+
+    .console-switch-actions .btn.active {
+      color: #fff;
+      border-color: rgba(125, 211, 252, 0.50);
+      background: linear-gradient(135deg, #2563eb, #0ea5e9);
+    }
+
+    @media (max-width: 900px) {
+      .console-switch-actions .btn {
+        flex: 1 1 180px;
+      }
+    }
+  </style>
+
 </head>
 <body>
   <main class="pkg-page">
+    <section class="console-switch-bar" aria-label="Console navigation">
+      <div class="console-switch-left">
+        <span class="console-current-badge">{{currentConsoleLabel}}</span>
+        <span class="console-switch-title">
+          <strong>{{consoleTitle}}</strong>
+          <span>{{libraryModeLabel}}</span>
+        </span>
+      </div>
+      <div class="console-switch-actions">
+        <a class="btn btn-outline-light btn-sm" href="{{consoleSelectUrl}}">
+          <i class="fa-solid fa-house"></i>
+          Main page
+        </a>
+        <a class="btn btn-outline-light btn-sm{{#isPs4}} active{{/isPs4}}" href="{{ps4LibraryUrl}}">
+          <i class="fa-solid fa-gamepad"></i>
+          PS4 library
+        </a>
+        <a class="btn btn-outline-light btn-sm{{#isPs5}} active{{/isPs5}}" href="{{ps5LibraryUrl}}">
+          <i class="fa-solid fa-gamepad"></i>
+          PS5 library
+        </a>
+        <a class="btn btn-outline-light btn-sm" href="{{ps5PayloadsUrl}}">
+          <i class="fa-solid fa-microchip"></i>
+          Payloads / ELF
+        </a>
+        <a class="btn btn-outline-light btn-sm" href="{{ps5HomebrewUrl}}">
+          <i class="fa-solid fa-folder-tree"></i>
+          Homebrew apps
+        </a>
+        <a class="btn btn-outline-light btn-sm" href="{{ps5ToolsUrl}}">
+          <i class="fa-solid fa-wrench"></i>
+          PS5 tools
+        </a>
+      </div>
+    </section>
+
 <section id="topThemeStage" class="top-theme-stage">
   <div class="top-theme-stage-bg" aria-hidden="true"></div>
 
@@ -817,6 +890,16 @@
             <i class="fa-solid fa-images"></i>
             Download missing covers
           </button>
+          {{#isPs5}}
+          <a class="btn btn-outline-light btn-sm" href="{{ps5PayloadsUrl}}">
+            <i class="fa-solid fa-microchip"></i>
+            Payloads / ELF
+          </a>
+          <a class="btn btn-outline-light btn-sm" href="{{ps5HomebrewUrl}}">
+            <i class="fa-solid fa-folder-tree"></i>
+            Homebrew apps
+          </a>
+          {{/isPs5}}
           <button class="btn btn-outline-light btn-sm" id="expandAll" type="button">Expand all</button>
         </div>
       </div>

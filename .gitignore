@@ -9,6 +9,8 @@ PS4Games/
 PS5Games/
 
 src/public/ps5-relapse/
+src/public/ps5-payloads/
+src/public/ps5-homebrew/
 
 # Ignore downloaded game covers/thumbnails
 src/public/images/*
@@ -18,6 +20,7 @@ src/public/thumbnail/*
 !src/public/images/.gitkeep
 !src/public/thumbnail/.gitkeep
 
-# Optional local backups
 BACKUP/
 screenshots/
+dist/
+RELEASE_NOTES.md

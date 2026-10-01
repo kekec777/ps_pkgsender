@@ -56,6 +56,18 @@ let installQueueSeq = 0;
 const ps5RelapseDir = path.resolve(
   process.env.PS5_RELAPSE_DIR || path.join(__dirname, 'public', 'ps5-relapse')
 );
+const ps5PayloadDir = path.resolve(
+  process.env.PS5_PAYLOAD_DIR || path.join(__dirname, 'public', 'ps5-payloads')
+);
+const ps5HomebrewDir = path.resolve(
+  process.env.PS5_HOMEBREW_DIR || path.join(__dirname, 'public', 'ps5-homebrew')
+);
+const ps5HomebrewArchiveDir = path.join(ps5HomebrewDir, 'archives');
+const ps5HomebrewAppsDir = path.join(ps5HomebrewDir, 'apps');
+const ps5HomebrewTmpDir = path.join(ps5HomebrewDir, 'tmp');
+const ps5FtpPort = Number.parseInt(process.env.PS5_FTP_PORT || '1337', 10);
+const ps5HomebrewRemoteRoot = process.env.PS5_HOMEBREW_REMOTE_ROOT || '/data/homebrew';
+const ps5FtpTimeoutMs = Number.parseInt(process.env.PS5_FTP_TIMEOUT_MS || '120000', 10);
 const coverImagesPath = path.join(__dirname, 'public', 'images');
 const thumbnailImagesPath = path.join(__dirname, 'public', 'thumbnail');
 const coverMapUrl = process.env.COVER_MAP_URL || 'https://raw.githubusercontent.com/hmn/ps4-imagemap/master/games.json';
@@ -284,6 +296,8 @@ app.use('/js', express.static(path.join(__dirname, '../node_modules/bootstrap/di
 app.use('/css', express.static(path.join(__dirname, 'views/css')));
 app.use('/public', express.static(path.join(__dirname, 'public')));
 app.use('/ps5/relapse', express.static(ps5RelapseDir, { extensions: ['html'] }));
+app.use('/ps5/payload-files', express.static(ps5PayloadDir, { dotfiles: 'deny', fallthrough: false }));
+app.use('/ps5/homebrew-files', express.static(ps5HomebrewAppsDir, { dotfiles: 'deny', fallthrough: false }));
 app.use('/pkgfiles/ps4', express.static(ps4PkgPath, { dotfiles: 'deny', fallthrough: false }));
 app.use('/pkgfiles/ps5', express.static(ps5PkgPath, { dotfiles: 'deny', fallthrough: false }));
 
@@ -365,12 +379,16 @@ function getConsoleViewData(consoleType = 'ps4') {
     otherConsoleUrl: isPs5 ? '/ps4' : '/ps5',
     otherConsoleLabel: isPs5 ? 'Open PS4 library' : 'Open PS5 library',
     consoleSelectUrl: '/',
-    consoleToolsUrl: isPs5 ? '/ps5/tools' : '',
+    ps4LibraryUrl: '/ps4',
+    ps5LibraryUrl: '/ps5',
+    consoleToolsUrl: '/ps5/tools',
     libraryModeLabel: isPs5 ? 'PS5 view: PS4 + PS5 packages' : 'PS4 view: PS4 packages only',
     consoleConfigJson: makeSafeScriptJson(config),
     ps5Host: currentPS5ipadr,
     ps5RelapseUrl: '/ps5/relapse/',
-    ps5ToolsUrl: '/ps5/tools'
+    ps5ToolsUrl: '/ps5/tools',
+    ps5PayloadsUrl: '/ps5/payloads',
+    ps5HomebrewUrl: '/ps5/homebrew'
   };
 }
 
@@ -575,6 +593,169 @@ app.post('/api/ps4ip', (req, res) => {
   res.json({ message: 'PS4 IP address updated', variable: currentPS4ipadr });
 });
 
+
+
+
+app.get('/ps5/homebrew', (req, res) => {
+  res.type('html').send(renderPs5HomebrewPage());
+});
+
+app.get('/api/ps5/homebrew/apps', (req, res) => {
+  try {
+    res.json({
+      ok: true,
+      homebrewDir: ps5HomebrewDir,
+      remoteRoot: ps5HomebrewRemoteRoot,
+      ftpPort: ps5FtpPort,
+      apps: getPs5HomebrewApps()
+    });
+  } catch (error) {
+    res.status(500).json({ ok: false, message: error.message });
+  }
+});
+
+app.post(
+  '/api/ps5/homebrew/upload',
+  express.raw({ type: () => true, limit: process.env.PS5_HOMEBREW_UPLOAD_LIMIT || '2gb' }),
+  async (req, res) => {
+    try {
+      const rawName = req.headers['x-homebrew-filename'] || req.query.filename || '';
+      const decodedName = decodeURIComponent(String(rawName || 'homebrew.zip'));
+      const filename = safePs5HomebrewName(decodedName);
+      const archivePath = resolvePs5HomebrewArchivePath(filename);
+
+      if (!Buffer.isBuffer(req.body) || req.body.length === 0) {
+        return res.status(400).json({ ok: false, message: 'Missing ZIP body' });
+      }
+
+      fs.writeFileSync(archivePath, req.body);
+
+      const appInfo = await extractPs5HomebrewArchive(archivePath);
+
+      res.json({
+        ok: true,
+        message: `Uploaded and extracted ${filename} as ${appInfo.name}`,
+        app: appInfo,
+        apps: getPs5HomebrewApps()
+      });
+    } catch (error) {
+      res.status(400).json({ ok: false, message: error.message });
+    }
+  }
+);
+
+app.delete('/api/ps5/homebrew/apps/:folder', (req, res) => {
+  try {
+    const appPath = resolvePs5HomebrewAppPath(req.params.folder);
+
+    if (!fs.existsSync(appPath)) {
+      return res.status(404).json({ ok: false, message: 'Homebrew app not found' });
+    }
+
+    fs.rmSync(appPath, { recursive: true, force: true });
+
+    res.json({
+      ok: true,
+      message: `Deleted ${path.basename(appPath)} from Docker storage`,
+      apps: getPs5HomebrewApps()
+    });
+  } catch (error) {
+    res.status(400).json({ ok: false, message: error.message });
+  }
+});
+
+app.post('/api/ps5/homebrew/apps/:folder/deploy', async (req, res) => {
+  try {
+    const result = await deployPs5HomebrewApp(req.params.folder, {
+      host: req.body?.host,
+      port: req.body?.port,
+      remoteRoot: req.body?.remoteRoot,
+      username: req.body?.username,
+      password: req.body?.password
+    });
+
+    res.json(result);
+  } catch (error) {
+    res.status(400).json({ ok: false, message: error.message });
+  }
+});
+
+app.get('/ps5/payloads', (req, res) => {
+  res.type('html').send(renderPs5PayloadPage());
+});
+
+app.get('/api/ps5/payloads', (req, res) => {
+  try {
+    res.json({
+      ok: true,
+      payloadDir: ps5PayloadDir,
+      payloads: getPs5Payloads()
+    });
+  } catch (error) {
+    res.status(500).json({ ok: false, message: error.message });
+  }
+});
+
+app.post(
+  '/api/ps5/payloads/upload',
+  express.raw({ type: () => true, limit: process.env.PS5_PAYLOAD_LIMIT || '200mb' }),
+  (req, res) => {
+    try {
+      const rawName = req.headers['x-payload-filename'] || req.query.filename || '';
+      const decodedName = decodeURIComponent(String(rawName || 'payload.elf'));
+      const filename = safePs5PayloadFilename(decodedName);
+      const filepath = resolvePs5PayloadPath(filename);
+
+      if (!Buffer.isBuffer(req.body) || req.body.length === 0) {
+        return res.status(400).json({ ok: false, message: 'Missing payload body' });
+      }
+
+      fs.writeFileSync(filepath, req.body);
+
+      res.json({
+        ok: true,
+        message: `Uploaded ${filename}`,
+        payload: {
+          name: filename,
+          size: req.body.length,
+          sizeLabel: formatDashboardSize(req.body.length),
+          downloadUrl: `/ps5/payload-files/${encodeURIComponent(filename)}`
+        }
+      });
+    } catch (error) {
+      res.status(400).json({ ok: false, message: error.message });
+    }
+  }
+);
+
+app.delete('/api/ps5/payloads/:filename', (req, res) => {
+  try {
+    const filepath = resolvePs5PayloadPath(req.params.filename);
+
+    if (!fs.existsSync(filepath)) {
+      return res.status(404).json({ ok: false, message: 'Payload not found' });
+    }
+
+    fs.unlinkSync(filepath);
+
+    res.json({
+      ok: true,
+      message: `Deleted ${path.basename(filepath)}`,
+      payloads: getPs5Payloads()
+    });
+  } catch (error) {
+    res.status(400).json({ ok: false, message: error.message });
+  }
+});
+
+app.post('/api/ps5/payloads/:filename/send', async (req, res) => {
+  try {
+    const result = await sendPs5PayloadFile(req.params.filename, req);
+    res.json(result);
+  } catch (error) {
+    res.status(400).json({ ok: false, message: error.message });
+  }
+});
 
 app.get('/api/ps5/info', (req, res) => {
   res.json({
@@ -1117,6 +1298,8 @@ app.use((err, req, res, next) => {
 app.listen(port, () => {
   console.log(`PS4/PS5 PKG sender listening on port ${port} serving files from ${staticFilesPath}`);
   console.log(`PS5 Relapse static path: ${ps5RelapseDir}`);
+  console.log(`PS5 payload directory: ${ps5PayloadDir}`);
+  console.log(`PS5 homebrew directory: ${ps5HomebrewDir}`);
 });
 
 function flattenPkgs(pkgs) {
@@ -1338,6 +1521,88 @@ function ps4Install(filepath) {
   });
 }
 
+
+function ensurePs5PayloadDir() {
+  fs.mkdirSync(ps5PayloadDir, { recursive: true });
+}
+
+function isAllowedPs5PayloadName(filename) {
+  return /\.(elf|bin|payload)$/i.test(String(filename || ''));
+}
+
+function safePs5PayloadFilename(value) {
+  const baseName = path.basename(String(value || 'payload.elf').trim() || 'payload.elf');
+  return baseName
+    .replace(/[<>:"\\|?*\x00-\x1F]/g, '_')
+    .replace(/\s+/g, ' ')
+    .slice(0, 180);
+}
+
+function resolvePs5PayloadPath(filename) {
+  ensurePs5PayloadDir();
+
+  const safeName = safePs5PayloadFilename(filename);
+
+  if (!safeName || !isAllowedPs5PayloadName(safeName)) {
+    throw new Error('Payload filename must end with .elf, .bin, or .payload');
+  }
+
+  const payloadPath = path.resolve(ps5PayloadDir, safeName);
+
+  if (!payloadPath.startsWith(ps5PayloadDir + path.sep)) {
+    throw new Error('Invalid payload path');
+  }
+
+  return payloadPath;
+}
+
+function getPs5Payloads() {
+  ensurePs5PayloadDir();
+
+  return fs.readdirSync(ps5PayloadDir)
+    .filter(isAllowedPs5PayloadName)
+    .map((filename) => {
+      const filepath = resolvePs5PayloadPath(filename);
+      const stat = fs.statSync(filepath);
+
+      return {
+        name: filename,
+        size: stat.size,
+        sizeLabel: formatDashboardSize(stat.size),
+        modifiedAt: stat.mtime.toISOString(),
+        downloadUrl: `/ps5/payload-files/${encodeURIComponent(filename)}`
+      };
+    })
+    .sort((a, b) => a.name.localeCompare(b.name));
+}
+
+async function sendPs5PayloadFile(filename, req) {
+  const filepath = resolvePs5PayloadPath(filename);
+
+  if (!fs.existsSync(filepath)) {
+    throw new Error('Payload not found');
+  }
+
+  const host = getRequiredPs5Host(req);
+  const portToUse = Number.parseInt(String(req.body?.port || req.query.port || ps5ElfPort), 10);
+
+  if (!Number.isInteger(portToUse) || portToUse <= 0 || portToUse > 65535) {
+    throw new Error('Invalid PS5 ELF loader port');
+  }
+
+  const buffer = fs.readFileSync(filepath);
+  const response = await sendTcpBuffer(host, portToUse, buffer, ps5TcpTimeoutMs);
+
+  return {
+    ok: true,
+    message: `Payload ${path.basename(filepath)} sent to ${host}:${portToUse}`,
+    payload: path.basename(filepath),
+    bytes: buffer.length,
+    response
+  };
+}
+
+
 function getRequiredPs5Host(req) {
   const host = String(req.body?.host || req.query?.host || currentPS5ipadr || '').trim();
 
@@ -1403,6 +1668,1420 @@ async function ps5InstallUrl(host, url, portToUse = ps5DpiPort) {
     url,
     response
   };
+}
+
+
+
+
+
+function ensurePs5HomebrewDirs() {
+  fs.mkdirSync(ps5HomebrewArchiveDir, { recursive: true });
+  fs.mkdirSync(ps5HomebrewAppsDir, { recursive: true });
+  fs.mkdirSync(ps5HomebrewTmpDir, { recursive: true });
+}
+
+function safePs5HomebrewName(value) {
+  return path.basename(String(value || 'homebrew').trim() || 'homebrew')
+    .replace(/[<>:"\\|?*\x00-\x1F]/g, '_')
+    .replace(/\s+/g, ' ')
+    .slice(0, 180);
+}
+
+function isAllowedHomebrewArchive(filename) {
+  return /\.zip$/i.test(String(filename || ''));
+}
+
+function safeHomebrewFolderName(value) {
+  const name = safePs5HomebrewName(value).replace(/\.zip$/i, '').trim() || 'homebrew';
+  return name
+    .replace(/[^a-zA-Z0-9._ -]/g, '_')
+    .replace(/\s+/g, '_')
+    .slice(0, 100);
+}
+
+function resolvePs5HomebrewAppPath(folderName) {
+  ensurePs5HomebrewDirs();
+
+  const safeName = safeHomebrewFolderName(folderName);
+  const appPath = path.resolve(ps5HomebrewAppsDir, safeName);
+
+  if (!appPath.startsWith(ps5HomebrewAppsDir + path.sep)) {
+    throw new Error('Invalid homebrew folder path');
+  }
+
+  return appPath;
+}
+
+function resolvePs5HomebrewArchivePath(filename) {
+  ensurePs5HomebrewDirs();
+
+  const safeName = safePs5HomebrewName(filename);
+
+  if (!safeName || !isAllowedHomebrewArchive(safeName)) {
+    throw new Error('Homebrew upload must be a .zip file');
+  }
+
+  const archivePath = path.resolve(ps5HomebrewArchiveDir, safeName);
+
+  if (!archivePath.startsWith(ps5HomebrewArchiveDir + path.sep)) {
+    throw new Error('Invalid homebrew archive path');
+  }
+
+  return archivePath;
+}
+
+function copyDirectorySync(src, dest) {
+  const stat = fs.statSync(src);
+
+  if (stat.isDirectory()) {
+    fs.mkdirSync(dest, { recursive: true });
+
+    fs.readdirSync(src).forEach((entry) => {
+      copyDirectorySync(path.join(src, entry), path.join(dest, entry));
+    });
+
+    return;
+  }
+
+  fs.mkdirSync(path.dirname(dest), { recursive: true });
+  fs.copyFileSync(src, dest);
+}
+
+function getDirectorySizeBytes(dir) {
+  if (!fs.existsSync(dir)) return 0;
+
+  return fs.readdirSync(dir).reduce((sum, entry) => {
+    const filepath = path.join(dir, entry);
+    const stat = fs.statSync(filepath);
+
+    if (stat.isDirectory()) {
+      return sum + getDirectorySizeBytes(filepath);
+    }
+
+    return sum + stat.size;
+  }, 0);
+}
+
+function listFilesRecursive(rootDir, currentDir = rootDir) {
+  if (!fs.existsSync(currentDir)) return [];
+
+  return fs.readdirSync(currentDir).flatMap((entry) => {
+    const filepath = path.join(currentDir, entry);
+    const stat = fs.statSync(filepath);
+
+    if (stat.isDirectory()) {
+      return listFilesRecursive(rootDir, filepath);
+    }
+
+    return [{
+      filepath,
+      relativePath: path.relative(rootDir, filepath).split(path.sep).join('/')
+    }];
+  });
+}
+
+function countFilesRecursive(dir) {
+  return listFilesRecursive(dir).length;
+}
+
+function getPs5HomebrewApps() {
+  ensurePs5HomebrewDirs();
+
+  return fs.readdirSync(ps5HomebrewAppsDir)
+    .map((name) => {
+      const appPath = path.join(ps5HomebrewAppsDir, name);
+      const stat = fs.statSync(appPath);
+
+      if (!stat.isDirectory()) return null;
+
+      const titleIdMatch = name.match(/PPSA\d{5}/i);
+
+      return {
+        name,
+        titleId: titleIdMatch ? titleIdMatch[0].toUpperCase() : '',
+        size: getDirectorySizeBytes(appPath),
+        sizeLabel: formatDashboardSize(getDirectorySizeBytes(appPath)),
+        fileCount: countFilesRecursive(appPath),
+        modifiedAt: stat.mtime.toISOString(),
+        downloadUrl: `/ps5/homebrew-files/${encodeURIComponent(name)}/`
+      };
+    })
+    .filter(Boolean)
+    .sort((a, b) => a.name.localeCompare(b.name));
+}
+
+function findBestHomebrewFolder(extractDir, fallbackName) {
+  const entries = fs.readdirSync(extractDir)
+    .map((entry) => ({
+      name: entry,
+      path: path.join(extractDir, entry)
+    }))
+    .filter((item) => fs.statSync(item.path).isDirectory());
+
+  const ppsa = entries.find((item) => /^PPSA\d{5}$/i.test(item.name));
+
+  if (ppsa) {
+    return { sourcePath: ppsa.path, folderName: ppsa.name.toUpperCase() };
+  }
+
+  if (entries.length === 1) {
+    return { sourcePath: entries[0].path, folderName: safeHomebrewFolderName(entries[0].name) };
+  }
+
+  return { sourcePath: extractDir, folderName: safeHomebrewFolderName(fallbackName) };
+}
+
+function extractPs5HomebrewArchive(archivePath) {
+  ensurePs5HomebrewDirs();
+
+  const baseName = safeHomebrewFolderName(path.basename(archivePath, path.extname(archivePath)));
+  const extractDir = path.join(ps5HomebrewTmpDir, `${baseName}-${Date.now()}`);
+
+  fs.rmSync(extractDir, { recursive: true, force: true });
+  fs.mkdirSync(extractDir, { recursive: true });
+
+  return new Promise((resolve, reject) => {
+    execFile('unzip', ['-q', '-o', archivePath, '-d', extractDir], { timeout: 120000 }, (err, stdout, stderr) => {
+      if (err) {
+        fs.rmSync(extractDir, { recursive: true, force: true });
+        return reject(new Error(`Could not extract ZIP. Make sure unzip is installed in the container. ${stderr || err.message}`));
+      }
+
+      try {
+        const detected = findBestHomebrewFolder(extractDir, baseName);
+        const folderName = safeHomebrewFolderName(detected.folderName);
+        const destPath = resolvePs5HomebrewAppPath(folderName);
+
+        fs.rmSync(destPath, { recursive: true, force: true });
+        copyDirectorySync(detected.sourcePath, destPath);
+        fs.rmSync(extractDir, { recursive: true, force: true });
+
+        const appInfo = getPs5HomebrewApps().find((item) => item.name === folderName) || {
+          name: folderName,
+          size: getDirectorySizeBytes(destPath),
+          sizeLabel: formatDashboardSize(getDirectorySizeBytes(destPath)),
+          fileCount: countFilesRecursive(destPath)
+        };
+
+        resolve(appInfo);
+      } catch (error) {
+        fs.rmSync(extractDir, { recursive: true, force: true });
+        reject(error);
+      }
+    });
+  });
+}
+
+function encodeFtpPath(remotePath) {
+  return String(remotePath || '/')
+    .split('/')
+    .map((part) => encodeURIComponent(part))
+    .join('/')
+    .replace(/^%2F/i, '/');
+}
+
+function buildFtpUrl(host, portNumber, remotePath) {
+  const encodedPath = encodeFtpPath(remotePath).replace(/^\/+/, '');
+  return `ftp://${host}:${portNumber}/${encodedPath}`;
+}
+
+function runCurlFtpUpload({ host, portNumber, username, password, localPath, remotePath }) {
+  return new Promise((resolve, reject) => {
+    const args = [
+      '--fail',
+      '--silent',
+      '--show-error',
+      '--ftp-create-dirs',
+      '--connect-timeout',
+      '15',
+      '--max-time',
+      String(Math.ceil(ps5FtpTimeoutMs / 1000)),
+      '-T',
+      localPath
+    ];
+
+    if (username) {
+      args.push('--user', `${username}:${password || ''}`);
+    }
+
+    args.push(buildFtpUrl(host, portNumber, remotePath));
+
+    execFile('curl', args, { timeout: ps5FtpTimeoutMs + 15000 }, (err, stdout, stderr) => {
+      if (err) {
+        return reject(new Error(stderr || err.message));
+      }
+
+      resolve({ stdout, stderr });
+    });
+  });
+}
+
+async function deployPs5HomebrewApp(folderName, options = {}) {
+  const appPath = resolvePs5HomebrewAppPath(folderName);
+
+  if (!fs.existsSync(appPath)) {
+    throw new Error('Homebrew app not found');
+  }
+
+  const host = String(options.host || currentPS5ipadr || '').trim();
+
+  if (!isValidHost(host)) {
+    throw new Error('Missing or invalid PS5 host/IP');
+  }
+
+  const portNumber = Number.parseInt(String(options.port || ps5FtpPort), 10);
+
+  if (!Number.isInteger(portNumber) || portNumber <= 0 || portNumber > 65535) {
+    throw new Error('Invalid PS5 FTP port');
+  }
+
+  const remoteRoot = String(options.remoteRoot || ps5HomebrewRemoteRoot || '/data/homebrew').replace(/\/+$/, '') || '/data/homebrew';
+  const username = String(options.username || '').trim();
+  const password = String(options.password || '');
+  const files = listFilesRecursive(appPath);
+
+  if (files.length === 0) {
+    throw new Error('Homebrew folder is empty');
+  }
+
+  const uploaded = [];
+  const errors = [];
+
+  for (const file of files) {
+    const remotePath = `${remoteRoot}/${path.basename(appPath)}/${file.relativePath}`;
+
+    try {
+      await runCurlFtpUpload({
+        host,
+        portNumber,
+        username,
+        password,
+        localPath: file.filepath,
+        remotePath
+      });
+
+      uploaded.push(file.relativePath);
+    } catch (error) {
+      errors.push({
+        file: file.relativePath,
+        message: error.message
+      });
+      break;
+    }
+  }
+
+  if (errors.length) {
+    throw new Error(`FTP upload failed after ${uploaded.length}/${files.length} file(s): ${errors[0].file}: ${errors[0].message}`);
+  }
+
+  return {
+    ok: true,
+    message: `Uploaded ${path.basename(appPath)} to ${host}:${portNumber}${remoteRoot}`,
+    folder: path.basename(appPath),
+    remotePath: `${remoteRoot}/${path.basename(appPath)}`,
+    uploaded: uploaded.length,
+    total: files.length
+  };
+}
+
+
+function renderPs5StandaloneNavCss() {
+  return `
+    .ps5-page-nav {
+      width: 100%;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 14px;
+      margin: 0 0 18px;
+      padding: 14px 16px;
+      color: var(--text);
+      background: rgba(15, 23, 42, 0.72);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 20px;
+      box-shadow: 0 14px 46px rgba(0, 0, 0, 0.24);
+    }
+
+    .ps5-nav-left,
+    .ps5-nav-actions {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .ps5-current-badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 70px;
+      padding: 8px 13px;
+      color: #fff;
+      background: linear-gradient(135deg, #2563eb, #0ea5e9);
+      border-radius: 999px;
+      font-weight: 1000;
+      letter-spacing: -.04em;
+    }
+
+    .ps5-nav-title {
+      display: grid;
+      gap: 2px;
+    }
+
+    .ps5-nav-title strong {
+      line-height: 1;
+    }
+
+    .ps5-nav-title span {
+      color: var(--muted);
+      font-size: .88rem;
+    }
+
+    .ps5-nav-button {
+      min-height: 34px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      padding: 7px 10px;
+      color: #fff;
+      text-decoration: none;
+      font-size: .84rem;
+      font-weight: 950;
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      border-radius: 999px;
+      background: rgba(2, 6, 23, 0.28);
+      box-shadow: inset 0 1px 0 rgba(255,255,255,.08);
+      white-space: nowrap;
+    }
+
+    .ps5-nav-button:hover,
+    .ps5-nav-button.active {
+      color: #fff;
+      border-color: rgba(125, 211, 252, 0.50);
+      background: linear-gradient(135deg, #2563eb, #0ea5e9);
+    }
+
+    .ps5-nav-button i {
+      pointer-events: none;
+    }
+
+    @media (max-width: 900px) {
+      .ps5-page-nav {
+        align-items: stretch;
+        flex-direction: column;
+      }
+
+      .ps5-nav-left,
+      .ps5-nav-actions {
+        width: 100%;
+      }
+
+      .ps5-nav-actions .ps5-nav-button {
+        flex: 1 1 180px;
+      }
+    }
+  `;
+}
+
+function renderPs5NavBar(active = '') {
+  const title = active === 'payloads'
+    ? 'Payload / ELF manager'
+    : active === 'homebrew'
+      ? 'Homebrew app manager'
+      : active === 'tools'
+        ? 'Relapse / etaHEN tools'
+        : 'PS5 package library';
+
+  const subtitle = active === 'payloads'
+    ? 'Upload, manage and send PS5 payloads'
+    : active === 'homebrew'
+      ? 'Upload ZIP apps and copy them to /data/homebrew'
+      : active === 'tools'
+        ? 'Relapse host, ELF sender and etaHEN DPI'
+        : 'PS5 view: PS4 + PS5 packages';
+
+  const navButton = (href, icon, label, key) => `
+        <a class="ps5-nav-button${active === key ? ' active' : ''}" href="${href}">
+          <i class="fa-solid ${icon}"></i>
+          ${label}
+        </a>`;
+
+  return `
+    <section class="ps5-page-nav" aria-label="PS5 navigation">
+      <div class="ps5-nav-left">
+        <span class="ps5-current-badge">PS5</span>
+        <span class="ps5-nav-title">
+          <strong>${title}</strong>
+          <span>${subtitle}</span>
+        </span>
+      </div>
+      <div class="ps5-nav-actions">
+${navButton('/', 'fa-house', 'Main page', 'main')}
+${navButton('/ps5', 'fa-gamepad', 'PS5 library', 'ps5')}
+${navButton('/ps4', 'fa-gamepad', 'PS4 library', 'ps4')}
+${navButton('/ps5/payloads', 'fa-microchip', 'Payloads / ELF', 'payloads')}
+${navButton('/ps5/homebrew', 'fa-folder-tree', 'Homebrew apps', 'homebrew')}
+${navButton('/ps5/tools', 'fa-wrench', 'PS5 tools', 'tools')}
+      </div>
+    </section>`;
+}
+
+
+
+function renderPs5HomebrewPage() {
+  const uploadLimit = process.env.PS5_HOMEBREW_UPLOAD_LIMIT || '2gb';
+
+  return `<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>PS5 Homebrew Apps - PKG Sender</title>
+  <link rel="stylesheet" href="/css/fontawesome.min.css">
+  <link rel="stylesheet" href="/css/solid.min.css">
+  <style>
+    ${renderPs5StandaloneNavCss()}
+
+    :root {
+      --bg: #07111f;
+      --panel: rgba(15, 23, 42, 0.86);
+      --panel-2: rgba(30, 41, 59, 0.64);
+      --border: rgba(255,255,255,0.14);
+      --text: #eef3ff;
+      --muted: #a9b8d4;
+      --blue: #3b82f6;
+      --green: #22c55e;
+      --red: #ef4444;
+      --yellow: #f59e0b;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: Inter, Segoe UI, Roboto, Arial, sans-serif;
+      color: var(--text);
+      background:
+        radial-gradient(circle at top left, rgba(59,130,246,.32), transparent 34rem),
+        radial-gradient(circle at bottom right, rgba(34,197,94,.18), transparent 38rem),
+        var(--bg);
+    }
+
+    .page {
+      width: min(1360px, calc(100vw - 48px));
+      margin: 0 auto;
+      padding: 18px 0 60px;
+    }
+
+    .hero,
+    .panel {
+      border: 1px solid var(--border);
+      background: var(--panel);
+      border-radius: 26px;
+      box-shadow: 0 24px 80px rgba(0,0,0,.32);
+      backdrop-filter: blur(18px);
+    }
+
+    .hero {
+      padding: 28px;
+      margin-bottom: 18px;
+    }
+
+    .eyebrow {
+      margin: 0 0 8px;
+      color: #93c5fd;
+      text-transform: uppercase;
+      letter-spacing: .12em;
+      font-size: .78rem;
+      font-weight: 1000;
+    }
+
+    h1, h2, h3, p { margin-top: 0; }
+
+    h1 {
+      margin-bottom: 10px;
+      font-size: clamp(2rem, 5vw, 4rem);
+      line-height: .95;
+      letter-spacing: -.07em;
+    }
+
+    .muted {
+      color: var(--muted);
+      line-height: 1.55;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: minmax(0, .95fr) minmax(0, 1.45fr);
+      gap: 18px;
+    }
+
+    .panel {
+      padding: 20px;
+      min-width: 0;
+    }
+
+    .field {
+      display: grid;
+      gap: 7px;
+      margin-bottom: 14px;
+    }
+
+    label {
+      color: var(--muted);
+      font-size: .85rem;
+      font-weight: 800;
+    }
+
+    input[type="text"],
+    input[type="number"],
+    input[type="password"],
+    input[type="file"] {
+      width: 100%;
+      color: var(--text);
+      background: rgba(2, 6, 23, .6);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 12px 13px;
+      outline: none;
+    }
+
+    .btn {
+      appearance: none;
+      border: 0;
+      cursor: pointer;
+      border-radius: 14px;
+      padding: 11px 14px;
+      color: #fff;
+      background: linear-gradient(135deg, #2563eb, #0ea5e9);
+      font-weight: 950;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      text-decoration: none;
+      white-space: nowrap;
+    }
+
+    .btn.secondary { background: rgba(255,255,255,.10); border: 1px solid var(--border); }
+    .btn.green { background: linear-gradient(135deg, #16a34a, #22c55e); }
+    .btn.red { background: linear-gradient(135deg, #dc2626, #ef4444); }
+    .btn:disabled { opacity: .55; cursor: not-allowed; }
+
+    .homebrew-list {
+      display: grid;
+      gap: 12px;
+    }
+
+    .homebrew-item {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 12px;
+      align-items: center;
+      padding: 14px;
+      border: 1px solid var(--border);
+      background: var(--panel-2);
+      border-radius: 18px;
+    }
+
+    .homebrew-name {
+      display: grid;
+      gap: 4px;
+      min-width: 0;
+    }
+
+    .homebrew-name strong {
+      overflow-wrap: anywhere;
+    }
+
+    .homebrew-actions {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
+
+    .status {
+      min-height: 44px;
+      margin-top: 14px;
+      padding: 12px 14px;
+      border-radius: 16px;
+      border: 1px solid var(--border);
+      background: rgba(255,255,255,.06);
+      color: var(--muted);
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+    }
+
+    .status.success { color: #bbf7d0; border-color: rgba(34,197,94,.35); }
+    .status.error { color: #fecaca; border-color: rgba(239,68,68,.40); }
+
+    .empty {
+      padding: 22px;
+      text-align: center;
+      color: var(--muted);
+      border: 1px dashed var(--border);
+      border-radius: 18px;
+    }
+
+    .help-box {
+      padding: 14px;
+      margin-top: 14px;
+      color: #dbeafe;
+      border: 1px solid rgba(125, 211, 252, 0.25);
+      border-radius: 16px;
+      background: rgba(14, 165, 233, 0.08);
+      line-height: 1.55;
+    }
+
+    @media (max-width: 900px) {
+      .grid { grid-template-columns: 1fr; }
+      .homebrew-item { grid-template-columns: 1fr; }
+      .homebrew-actions { justify-content: flex-start; }
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    ${renderPs5NavBar('homebrew')}
+
+    <section class="hero">
+      <p class="eyebrow">PS5</p>
+      <h1>Homebrew app manager</h1>
+      <p class="muted">
+        Upload a ZIP that contains a homebrew folder, for example <strong>PPSA99008</strong>.
+        The app extracts it locally, then can copy it to <strong>/data/homebrew/&lt;folder&gt;</strong> on your PS5 over FTP.
+      </p>
+    </section>
+
+    <section class="grid">
+      <article class="panel">
+        <p class="eyebrow">PS5 FTP</p>
+        <h2>Deploy settings</h2>
+
+        <div class="field">
+          <label for="ps5Host">PS5 IP / host</label>
+          <input id="ps5Host" type="text" value="${escapeHtml(currentPS5ipadr || '')}" placeholder="192.168.1.110">
+        </div>
+
+        <div class="field">
+          <label for="ps5Port">FTP port</label>
+          <input id="ps5Port" type="number" value="${ps5FtpPort}" min="1" max="65535">
+        </div>
+
+        <div class="field">
+          <label for="remoteRoot">Remote folder</label>
+          <input id="remoteRoot" type="text" value="${escapeHtml(ps5HomebrewRemoteRoot)}" placeholder="/data/homebrew">
+        </div>
+
+        <div class="field">
+          <label for="ftpUser">FTP username, optional</label>
+          <input id="ftpUser" type="text" placeholder="Leave empty for anonymous/no auth">
+        </div>
+
+        <div class="field">
+          <label for="ftpPass">FTP password, optional</label>
+          <input id="ftpPass" type="password" placeholder="Leave empty if not needed">
+        </div>
+
+        <div class="help-box">
+          etaHEN FTP normally uses port <strong>1337</strong>. Make sure etaHEN is running and FTP is enabled before deploying.
+        </div>
+
+        <hr style="border:0;border-top:1px solid rgba(255,255,255,.12);margin:18px 0">
+
+        <p class="eyebrow">Upload</p>
+        <h2>Add homebrew ZIP</h2>
+
+        <div class="field">
+          <label for="homebrewFile">Homebrew ZIP</label>
+          <input id="homebrewFile" type="file" accept=".zip">
+        </div>
+
+        <button class="btn green" id="uploadBtn" type="button">
+          <i class="fa-solid fa-upload"></i>
+          Upload and extract
+        </button>
+
+        <p class="muted" style="margin-top:12px">
+          Max upload size: ${escapeHtml(uploadLimit)}.
+        </p>
+
+        <div class="status" id="statusBox">Ready.</div>
+      </article>
+
+      <article class="panel">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:12px">
+          <div>
+            <p class="eyebrow">Library</p>
+            <h2 style="margin:0">Extracted homebrew apps</h2>
+          </div>
+          <button class="btn secondary" id="refreshBtn" type="button">
+            <i class="fa-solid fa-rotate"></i>
+            Refresh
+          </button>
+        </div>
+
+        <div class="homebrew-list" id="homebrewList"></div>
+      </article>
+    </section>
+  </main>
+
+  <script>
+    const listEl = document.getElementById('homebrewList');
+    const statusBox = document.getElementById('statusBox');
+    const uploadBtn = document.getElementById('uploadBtn');
+    const refreshBtn = document.getElementById('refreshBtn');
+    const fileInput = document.getElementById('homebrewFile');
+    const hostInput = document.getElementById('ps5Host');
+    const portInput = document.getElementById('ps5Port');
+    const remoteRootInput = document.getElementById('remoteRoot');
+    const ftpUserInput = document.getElementById('ftpUser');
+    const ftpPassInput = document.getElementById('ftpPass');
+
+    function setStatus(message, type) {
+      statusBox.className = 'status ' + (type || '');
+      statusBox.textContent = message || '';
+    }
+
+    function escapeText(value) {
+      return String(value || '').replace(/[&<>"']/g, function (char) {
+        return {
+          '&': '&amp;',
+          '<': '&lt;',
+          '>': '&gt;',
+          '"': '&quot;',
+          "'": '&#39;'
+        }[char];
+      });
+    }
+
+    function requestJson(url, options) {
+      options = options || {};
+      options.headers = options.headers || {};
+      options.headers.Accept = 'application/json';
+
+      return fetch(url, options).then(function (response) {
+        return response.text().then(function (text) {
+          var data = {};
+          try { data = text ? JSON.parse(text) : {}; }
+          catch (error) { data = { message: text }; }
+
+          if (!response.ok) {
+            throw new Error(data.message || data.error || response.statusText);
+          }
+
+          return data;
+        });
+      });
+    }
+
+    function appActionUrl(app, action) {
+      return '/api/ps5/homebrew/apps/' + encodeURIComponent(app.name) + '/' + action;
+    }
+
+    function renderApps(apps) {
+      listEl.innerHTML = '';
+
+      if (!apps.length) {
+        listEl.innerHTML = '<div class="empty">No homebrew apps extracted yet.</div>';
+        return;
+      }
+
+      apps.forEach(function (app) {
+        var item = document.createElement('div');
+        item.className = 'homebrew-item';
+
+        var title = app.titleId ? app.name + ' · ' + app.titleId : app.name;
+        var meta = app.sizeLabel + ' · ' + app.fileCount + ' file(s) · Modified ' + new Date(app.modifiedAt).toLocaleString();
+
+        item.innerHTML =
+          '<div class="homebrew-name">' +
+            '<strong>' + escapeText(title) + '</strong>' +
+            '<small class="muted">' + escapeText(meta) + '</small>' +
+          '</div>' +
+          '<div class="homebrew-actions">' +
+            '<button class="btn green" type="button" data-action="deploy"><i class="fa-solid fa-cloud-arrow-up"></i> Deploy to PS5</button>' +
+            '<button class="btn red" type="button" data-action="delete"><i class="fa-solid fa-trash"></i> Delete</button>' +
+          '</div>';
+
+        item.querySelector('[data-action="deploy"]').addEventListener('click', function () {
+          deployApp(app);
+        });
+
+        item.querySelector('[data-action="delete"]').addEventListener('click', function () {
+          deleteApp(app);
+        });
+
+        listEl.appendChild(item);
+      });
+    }
+
+    function loadApps() {
+      setStatus('Loading homebrew app list...');
+      return requestJson('/api/ps5/homebrew/apps')
+        .then(function (data) {
+          renderApps(data.apps || []);
+          setStatus('Ready.');
+        })
+        .catch(function (error) {
+          setStatus(error.message, 'error');
+        });
+    }
+
+    function uploadHomebrew() {
+      var file = fileInput.files && fileInput.files[0];
+
+      if (!file) {
+        setStatus('Choose a .zip file first.', 'error');
+        return;
+      }
+
+      uploadBtn.disabled = true;
+      setStatus('Uploading and extracting ' + file.name + '...');
+
+      file.arrayBuffer()
+        .then(function (buffer) {
+          return requestJson('/api/ps5/homebrew/upload', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/octet-stream',
+              'x-homebrew-filename': encodeURIComponent(file.name)
+            },
+            body: buffer
+          });
+        })
+        .then(function (data) {
+          setStatus(data.message || 'Homebrew ZIP uploaded and extracted.', 'success');
+          fileInput.value = '';
+          return loadApps();
+        })
+        .catch(function (error) {
+          setStatus(error.message, 'error');
+        })
+        .finally(function () {
+          uploadBtn.disabled = false;
+        });
+    }
+
+    function deployApp(app) {
+      var host = hostInput.value.trim();
+      var port = portInput.value.trim();
+      var remoteRoot = remoteRootInput.value.trim() || '/data/homebrew';
+
+      if (!host) {
+        setStatus('Enter your PS5 IP first.', 'error');
+        return;
+      }
+
+      setStatus('Deploying ' + app.name + ' to ' + host + ':' + port + remoteRoot + '/' + app.name + '...');
+
+      requestJson(appActionUrl(app, 'deploy'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          host: host,
+          port: port,
+          remoteRoot: remoteRoot,
+          username: ftpUserInput.value.trim(),
+          password: ftpPassInput.value
+        })
+      }).then(function (data) {
+        setStatus((data.message || 'Deploy finished.') + '\\nRemote path: ' + (data.remotePath || '') + '\\nFiles: ' + (data.uploaded || 0) + '/' + (data.total || 0), 'success');
+      }).catch(function (error) {
+        setStatus(error.message, 'error');
+      });
+    }
+
+    function deleteApp(app) {
+      if (!confirm('Delete extracted app "' + app.name + '" from the Docker container?')) return;
+
+      setStatus('Deleting ' + app.name + '...');
+
+      requestJson('/api/ps5/homebrew/apps/' + encodeURIComponent(app.name), {
+        method: 'DELETE'
+      }).then(function (data) {
+        setStatus(data.message || 'Homebrew app deleted.', 'success');
+        return loadApps();
+      }).catch(function (error) {
+        setStatus(error.message, 'error');
+      });
+    }
+
+    uploadBtn.addEventListener('click', uploadHomebrew);
+    refreshBtn.addEventListener('click', loadApps);
+    loadApps();
+  </script>
+</body>
+</html>`;
+}
+
+
+function renderPs5PayloadPage() {
+  const payloadLimit = process.env.PS5_PAYLOAD_LIMIT || '200mb';
+
+  return `<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>PS5 Payload Manager</title>
+  <link rel="stylesheet" href="/css/fontawesome.min.css">
+  <link rel="stylesheet" href="/css/solid.min.css">
+  <style>
+    ${renderPs5StandaloneNavCss()}
+
+    :root {
+      --bg: #07111f;
+      --panel: rgba(15, 23, 42, 0.86);
+      --panel-2: rgba(30, 41, 59, 0.64);
+      --border: rgba(255,255,255,0.14);
+      --text: #eef3ff;
+      --muted: #a9b8d4;
+      --blue: #3b82f6;
+      --green: #22c55e;
+      --red: #ef4444;
+      --yellow: #f59e0b;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: Inter, Segoe UI, Roboto, Arial, sans-serif;
+      color: var(--text);
+      background:
+        radial-gradient(circle at top left, rgba(59,130,246,.32), transparent 34rem),
+        radial-gradient(circle at bottom right, rgba(34,197,94,.18), transparent 38rem),
+        var(--bg);
+    }
+
+    .page {
+      width: min(1360px, calc(100vw - 48px));
+      margin: 0 auto;
+      padding: 18px 0 60px;
+    }
+
+    .topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 14px;
+      flex-wrap: wrap;
+      margin-bottom: 18px;
+    }
+
+    .back {
+      color: var(--text);
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 14px;
+      border: 1px solid var(--border);
+      background: rgba(255,255,255,.06);
+      border-radius: 999px;
+      font-weight: 800;
+    }
+
+    .hero,
+    .panel {
+      border: 1px solid var(--border);
+      background: var(--panel);
+      border-radius: 26px;
+      box-shadow: 0 24px 80px rgba(0,0,0,.32);
+      backdrop-filter: blur(18px);
+    }
+
+    .hero {
+      padding: 28px;
+      margin-bottom: 18px;
+    }
+
+    .eyebrow {
+      margin: 0 0 8px;
+      color: #93c5fd;
+      text-transform: uppercase;
+      letter-spacing: .12em;
+      font-size: .78rem;
+      font-weight: 1000;
+    }
+
+    h1, h2, h3, p { margin-top: 0; }
+
+    h1 {
+      margin-bottom: 10px;
+      font-size: clamp(2rem, 5vw, 4rem);
+      line-height: .95;
+      letter-spacing: -.07em;
+    }
+
+    .muted {
+      color: var(--muted);
+      line-height: 1.55;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: minmax(0, .95fr) minmax(0, 1.45fr);
+      gap: 18px;
+    }
+
+    .panel {
+      padding: 20px;
+      min-width: 0;
+    }
+
+    .field {
+      display: grid;
+      gap: 7px;
+      margin-bottom: 14px;
+    }
+
+    label {
+      color: var(--muted);
+      font-size: .85rem;
+      font-weight: 800;
+    }
+
+    input[type="text"],
+    input[type="number"],
+    input[type="file"] {
+      width: 100%;
+      color: var(--text);
+      background: rgba(2, 6, 23, .6);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 12px 13px;
+      outline: none;
+    }
+
+    .btn {
+      appearance: none;
+      border: 0;
+      cursor: pointer;
+      border-radius: 14px;
+      padding: 11px 14px;
+      color: #fff;
+      background: linear-gradient(135deg, #2563eb, #0ea5e9);
+      font-weight: 950;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      text-decoration: none;
+      white-space: nowrap;
+    }
+
+    .btn.secondary { background: rgba(255,255,255,.10); border: 1px solid var(--border); }
+    .btn.green { background: linear-gradient(135deg, #16a34a, #22c55e); }
+    .btn.red { background: linear-gradient(135deg, #dc2626, #ef4444); }
+    .btn:disabled { opacity: .55; cursor: not-allowed; }
+
+    .payload-list {
+      display: grid;
+      gap: 12px;
+    }
+
+    .payload-item {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 12px;
+      align-items: center;
+      padding: 14px;
+      border: 1px solid var(--border);
+      background: var(--panel-2);
+      border-radius: 18px;
+    }
+
+    .payload-name {
+      display: grid;
+      gap: 4px;
+      min-width: 0;
+    }
+
+    .payload-name strong {
+      overflow-wrap: anywhere;
+    }
+
+    .payload-actions {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
+
+    .status {
+      min-height: 44px;
+      margin-top: 14px;
+      padding: 12px 14px;
+      border-radius: 16px;
+      border: 1px solid var(--border);
+      background: rgba(255,255,255,.06);
+      color: var(--muted);
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+    }
+
+    .status.success { color: #bbf7d0; border-color: rgba(34,197,94,.35); }
+    .status.error { color: #fecaca; border-color: rgba(239,68,68,.40); }
+
+    .empty {
+      padding: 22px;
+      text-align: center;
+      color: var(--muted);
+      border: 1px dashed var(--border);
+      border-radius: 18px;
+    }
+
+    @media (max-width: 880px) {
+      .grid { grid-template-columns: 1fr; }
+      .payload-item { grid-template-columns: 1fr; }
+      .payload-actions { justify-content: flex-start; }
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+${renderPs5NavBar('payloads')}
+
+    <section class="hero">
+      <p class="eyebrow">PS5</p>
+      <h1>Payload / ELF manager</h1>
+      <p class="muted">
+        Upload, list, delete, download, and send PS5 payload files to the ELF loader port.
+        Allowed files: <strong>.elf</strong>, <strong>.bin</strong>, and <strong>.payload</strong>.
+      </p>
+    </section>
+
+    <section class="grid">
+      <article class="panel">
+        <p class="eyebrow">Target</p>
+        <h2>Send settings</h2>
+
+        <div class="field">
+          <label for="ps5Host">PS5 IP / host</label>
+          <input id="ps5Host" type="text" value="${escapeHtml(currentPS5ipadr || '')}" placeholder="192.168.1.110">
+        </div>
+
+        <div class="field">
+          <label for="ps5Port">ELF loader port</label>
+          <input id="ps5Port" type="number" value="${ps5ElfPort}" min="1" max="65535">
+        </div>
+
+        <p class="muted">
+          Max upload size: ${escapeHtml(payloadLimit)}.
+          The payload is sent as raw bytes over TCP to the configured host and port.
+        </p>
+
+        <hr style="border:0;border-top:1px solid rgba(255,255,255,.12);margin:18px 0">
+
+        <p class="eyebrow">Upload</p>
+        <h2>Add payload</h2>
+
+        <div class="field">
+          <label for="payloadFile">Payload file</label>
+          <input id="payloadFile" type="file" accept=".elf,.bin,.payload">
+        </div>
+
+        <button class="btn green" id="uploadBtn" type="button">
+          <i class="fa-solid fa-upload"></i>
+          Upload payload
+        </button>
+
+        <div class="status" id="statusBox">Ready.</div>
+      </article>
+
+      <article class="panel">
+        <div class="topbar" style="margin-bottom:12px">
+          <div>
+            <p class="eyebrow">Library</p>
+            <h2 style="margin:0">Saved payloads</h2>
+          </div>
+          <button class="btn secondary" id="refreshBtn" type="button">
+            <i class="fa-solid fa-rotate"></i>
+            Refresh
+          </button>
+        </div>
+
+        <div class="payload-list" id="payloadList"></div>
+      </article>
+    </section>
+  </main>
+
+  <script>
+    const listEl = document.getElementById('payloadList');
+    const statusBox = document.getElementById('statusBox');
+    const uploadBtn = document.getElementById('uploadBtn');
+    const refreshBtn = document.getElementById('refreshBtn');
+    const fileInput = document.getElementById('payloadFile');
+    const hostInput = document.getElementById('ps5Host');
+    const portInput = document.getElementById('ps5Port');
+
+    function setStatus(message, type) {
+      statusBox.className = 'status ' + (type || '');
+      statusBox.textContent = message || '';
+    }
+
+    function escapeText(value) {
+      return String(value || '').replace(/[&<>"']/g, function (char) {
+        return {
+          '&': '&amp;',
+          '<': '&lt;',
+          '>': '&gt;',
+          '"': '&quot;',
+          "'": '&#39;'
+        }[char];
+      });
+    }
+
+    function requestJson(url, options) {
+      options = options || {};
+      options.headers = options.headers || {};
+      options.headers.Accept = 'application/json';
+
+      return fetch(url, options).then(function (response) {
+        return response.text().then(function (text) {
+          var data = {};
+          try { data = text ? JSON.parse(text) : {}; }
+          catch (error) { data = { message: text }; }
+
+          if (!response.ok) {
+            throw new Error(data.message || data.error || response.statusText);
+          }
+
+          return data;
+        });
+      });
+    }
+
+    function payloadActionUrl(payload, action) {
+      return '/api/ps5/payloads/' + encodeURIComponent(payload.name) + '/' + action;
+    }
+
+    function renderPayloads(payloads) {
+      listEl.innerHTML = '';
+
+      if (!payloads.length) {
+        listEl.innerHTML = '<div class="empty">No payload files uploaded yet.</div>';
+        return;
+      }
+
+      payloads.forEach(function (payload) {
+        var item = document.createElement('div');
+        item.className = 'payload-item';
+
+        item.innerHTML =
+          '<div class="payload-name">' +
+            '<strong>' + escapeText(payload.name) + '</strong>' +
+            '<small class="muted">' + escapeText(payload.sizeLabel) + ' · Modified ' + escapeText(new Date(payload.modifiedAt).toLocaleString()) + '</small>' +
+          '</div>' +
+          '<div class="payload-actions">' +
+            '<a class="btn secondary" href="' + escapeText(payload.downloadUrl) + '" download><i class="fa-solid fa-download"></i> Download</a>' +
+            '<button class="btn green" type="button" data-action="send"><i class="fa-solid fa-paper-plane"></i> Send</button>' +
+            '<button class="btn red" type="button" data-action="delete"><i class="fa-solid fa-trash"></i> Delete</button>' +
+          '</div>';
+
+        item.querySelector('[data-action="send"]').addEventListener('click', function () {
+          sendPayload(payload);
+        });
+
+        item.querySelector('[data-action="delete"]').addEventListener('click', function () {
+          deletePayload(payload);
+        });
+
+        listEl.appendChild(item);
+      });
+    }
+
+    function loadPayloads() {
+      setStatus('Loading payload list...');
+      return requestJson('/api/ps5/payloads')
+        .then(function (data) {
+          renderPayloads(data.payloads || []);
+          setStatus('Ready.');
+        })
+        .catch(function (error) {
+          setStatus(error.message, 'error');
+        });
+    }
+
+    function uploadPayload() {
+      var file = fileInput.files && fileInput.files[0];
+
+      if (!file) {
+        setStatus('Choose a .elf, .bin, or .payload file first.', 'error');
+        return;
+      }
+
+      uploadBtn.disabled = true;
+      setStatus('Uploading ' + file.name + '...');
+
+      file.arrayBuffer()
+        .then(function (buffer) {
+          return requestJson('/api/ps5/payloads/upload', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/octet-stream',
+              'x-payload-filename': encodeURIComponent(file.name)
+            },
+            body: buffer
+          });
+        })
+        .then(function (data) {
+          setStatus(data.message || 'Payload uploaded.', 'success');
+          fileInput.value = '';
+          return loadPayloads();
+        })
+        .catch(function (error) {
+          setStatus(error.message, 'error');
+        })
+        .finally(function () {
+          uploadBtn.disabled = false;
+        });
+    }
+
+    function sendPayload(payload) {
+      var host = hostInput.value.trim();
+      var port = portInput.value.trim();
+
+      setStatus('Sending ' + payload.name + ' to ' + host + ':' + port + '...');
+
+      requestJson(payloadActionUrl(payload, 'send'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ host: host, port: port })
+      }).then(function (data) {
+        setStatus((data.message || 'Payload sent.') + '\\nBytes: ' + (data.bytes || 0), 'success');
+      }).catch(function (error) {
+        setStatus(error.message, 'error');
+      });
+    }
+
+    function deletePayload(payload) {
+      if (!confirm('Delete payload "' + payload.name + '"?')) return;
+
+      setStatus('Deleting ' + payload.name + '...');
+
+      requestJson('/api/ps5/payloads/' + encodeURIComponent(payload.name), {
+        method: 'DELETE'
+      }).then(function (data) {
+        setStatus(data.message || 'Payload deleted.', 'success');
+        return loadPayloads();
+      }).catch(function (error) {
+        setStatus(error.message, 'error');
+      });
+    }
+
+    uploadBtn.addEventListener('click', uploadPayload);
+    refreshBtn.addEventListener('click', loadPayloads);
+    loadPayloads();
+  </script>
+</body>
+</html>`;
 }
 
 
@@ -1665,6 +3344,10 @@ function renderConsoleSelectPage() {
         <a class="small-link" href="/ps5/tools">PS5 Relapse tools</a>
         <span style="color:rgba(255,255,255,.24)">•</span>
         <a class="small-link" href="/ps5/relapse/">Open Relapse host</a>
+        <span style="color:rgba(255,255,255,.24)">•</span>
+        <a class="small-link" href="/ps5/payloads">PS5 Payload / ELF manager</a>
+        <span style="color:rgba(255,255,255,.24)">•</span>
+        <a class="small-link" href="/ps5/homebrew">PS5 Homebrew apps</a>
       </div>
     </section>
   </main>
@@ -1683,62 +3366,341 @@ function renderPs5SupportPage() {
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>PS5 Relapse Support - PKG Sender</title>
+  <title>PS5 Tools - PKG Sender</title>
+  <link rel="stylesheet" href="/css/fontawesome.min.css">
+  <link rel="stylesheet" href="/css/solid.min.css">
   <style>
-    body { margin: 0; min-height: 100vh; font-family: system-ui, -apple-system, Segoe UI, sans-serif; color: #eef3ff; background: radial-gradient(circle at top left, rgba(59,130,246,.28), transparent 32rem), #07111f; }
-    main { width: min(980px, calc(100% - 28px)); margin: 0 auto; padding: 28px 0 60px; }
-    .card { margin: 0 0 18px; padding: 22px; border: 1px solid rgba(255,255,255,.14); border-radius: 20px; background: rgba(15,23,42,.88); box-shadow: 0 22px 80px rgba(0,0,0,.35); }
-    h1 { margin: 0 0 10px; font-size: clamp(2.2rem, 6vw, 4rem); line-height: .95; }
-    h2 { margin: 0 0 14px; }
-    p { color: #a9b8d4; line-height: 1.55; }
-    label { display: grid; gap: 8px; margin: 12px 0; font-weight: 800; color: #cbd5e1; }
-    input { min-height: 46px; padding: 8px 12px; border-radius: 12px; border: 1px solid rgba(255,255,255,.18); color: #fff; background: rgba(255,255,255,.08); }
-    button, a.button { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 44px; padding: 0 16px; border: 0; border-radius: 12px; color: #fff; background: #2563eb; font-weight: 900; text-decoration: none; cursor: pointer; }
-    button.secondary, a.secondary { background: rgba(255,255,255,.10); border: 1px solid rgba(255,255,255,.16); }
-    .row { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }
-    .status { min-height: 24px; color: #7dd3fc; font-weight: 800; }
-    code { color: #93c5fd; }
+    ${renderPs5StandaloneNavCss()}
+
+    :root {
+      --bg: #07111f;
+      --panel: rgba(15, 23, 42, 0.86);
+      --panel-2: rgba(30, 41, 59, 0.64);
+      --border: rgba(255,255,255,0.14);
+      --text: #eef3ff;
+      --muted: #a9b8d4;
+      --blue: #3b82f6;
+      --green: #22c55e;
+      --red: #ef4444;
+      --yellow: #f59e0b;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: Inter, Segoe UI, Roboto, Arial, sans-serif;
+      color: var(--text);
+      background:
+        radial-gradient(circle at top left, rgba(59,130,246,.32), transparent 34rem),
+        radial-gradient(circle at bottom right, rgba(34,197,94,.18), transparent 38rem),
+        var(--bg);
+    }
+
+    .page {
+      width: min(1360px, calc(100vw - 48px));
+      margin: 0 auto;
+      padding: 18px 0 60px;
+    }
+
+    .topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 14px;
+      flex-wrap: wrap;
+      margin-bottom: 18px;
+    }
+
+    .nav-actions {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .back,
+    .nav-pill {
+      color: var(--text);
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      min-height: 42px;
+      padding: 10px 14px;
+      border: 1px solid var(--border);
+      background: rgba(255,255,255,.06);
+      border-radius: 999px;
+      font-weight: 900;
+      white-space: nowrap;
+    }
+
+    .nav-pill.active {
+      background: linear-gradient(135deg, #2563eb, #0ea5e9);
+      border-color: rgba(125, 211, 252, .5);
+    }
+
+    .hero,
+    .panel {
+      border: 1px solid var(--border);
+      background: var(--panel);
+      border-radius: 26px;
+      box-shadow: 0 24px 80px rgba(0,0,0,.32);
+      backdrop-filter: blur(18px);
+      -webkit-backdrop-filter: blur(18px);
+    }
+
+    .hero {
+      padding: 28px;
+      margin-bottom: 18px;
+    }
+
+    .eyebrow {
+      margin: 0 0 8px;
+      color: #93c5fd;
+      text-transform: uppercase;
+      letter-spacing: .12em;
+      font-size: .78rem;
+      font-weight: 1000;
+    }
+
+    h1, h2, h3, p { margin-top: 0; }
+
+    h1 {
+      margin-bottom: 10px;
+      font-size: clamp(2rem, 5vw, 4rem);
+      line-height: .95;
+      letter-spacing: -.07em;
+    }
+
+    h2 { margin-bottom: 14px; }
+
+    .muted,
+    p {
+      color: var(--muted);
+      line-height: 1.55;
+    }
+
+    .tools-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 18px;
+      align-items: stretch;
+    }
+
+    .panel {
+      padding: 20px;
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .panel.equal-panel { min-height: 100%; }
+
+    .field {
+      display: grid;
+      gap: 7px;
+      margin-bottom: 10px;
+    }
+
+    label,
+    .label {
+      color: var(--muted);
+      font-size: .85rem;
+      font-weight: 850;
+    }
+
+    input[type="text"],
+    input[type="number"],
+    input[type="file"],
+    input:not([type]) {
+      width: 100%;
+      min-height: 46px;
+      color: var(--text);
+      background: rgba(2, 6, 23, .6);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 12px 13px;
+      outline: none;
+    }
+
+    input:focus {
+      border-color: rgba(125, 211, 252, .75);
+      box-shadow: 0 0 0 4px rgba(59, 130, 246, .16);
+    }
+
+    .btn,
+    button,
+    a.button {
+      appearance: none;
+      border: 0;
+      cursor: pointer;
+      border-radius: 14px;
+      min-height: 44px;
+      padding: 11px 14px;
+      color: #fff;
+      background: linear-gradient(135deg, #2563eb, #0ea5e9);
+      font-weight: 950;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      text-decoration: none;
+      white-space: nowrap;
+    }
+
+    .btn.secondary,
+    button.secondary,
+    a.secondary {
+      background: rgba(255,255,255,.10);
+      border: 1px solid var(--border);
+    }
+
+    .btn.green,
+    button.green {
+      background: linear-gradient(135deg, #16a34a, #22c55e);
+    }
+
+    .btn:disabled,
+    button:disabled {
+      opacity: .55;
+      cursor: not-allowed;
+    }
+
+    .button-row {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      align-items: center;
+      margin-top: auto;
+    }
+
+    .status {
+      min-height: 44px;
+      margin-top: 2px;
+      padding: 12px 14px;
+      border-radius: 16px;
+      border: 1px solid var(--border);
+      background: rgba(255,255,255,.06);
+      color: #7dd3fc;
+      font-weight: 800;
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+    }
+
+    .status.empty {
+      color: var(--muted);
+      font-weight: 700;
+    }
+
+    code {
+      color: #93c5fd;
+      overflow-wrap: anywhere;
+    }
+
+    .path-box {
+      padding: 12px 14px;
+      border-radius: 16px;
+      background: rgba(2, 6, 23, .55);
+      border: 1px solid var(--border);
+      color: var(--muted);
+      overflow-wrap: anywhere;
+    }
+
+    @media (max-width: 900px) {
+      .tools-grid { grid-template-columns: 1fr; }
+      .topbar { align-items: stretch; flex-direction: column; }
+      .nav-actions { align-items: stretch; }
+      .back, .nav-pill, .button-row .btn, .button-row button, .button-row a.button { width: 100%; }
+    }
   </style>
 </head>
 <body>
-  <main>
-    <section class="card">
-      <h1>PS5 Relapse Support</h1>
-      <p>Host the Relapse page locally, send ELF/BIN payloads to the PS5 ELF loader, and send PKG URLs to etaHEN Direct PKG Installer.</p>
-      <p>Relapse folder: <code>${escapeHtml(ps5RelapseDir)}</code> ${relapseAvailable ? '✅ found' : '⚠️ not found yet'}</p>
+  <main class="page">
+${renderPs5NavBar('tools')}
+
+    <section class="hero">
+      <p class="eyebrow">PS5</p>
+      <h1>Relapse / etaHEN tools</h1>
+      <p class="muted">
+        Host the Relapse page locally, save the PS5 target IP, send a one-off ELF/BIN payload,
+        and send direct PKG URLs to etaHEN Direct PKG Installer.
+      </p>
     </section>
 
-    <section class="card">
-      <h2>PS5 connection</h2>
-      <label>PS5 IP / host
-        <input id="ps5Host" value="${escapedHost}" placeholder="192.168.1.110">
-      </label>
-      <div class="row">
-        <button id="saveHost">Save PS5 IP</button>
-        <a class="button secondary" href="/ps5/relapse/" target="_blank" rel="noopener">Open Relapse host</a>
-        <a id="etaHenWeb" class="button secondary" href="${etaHenWebUrl}" target="_blank" rel="noopener">Open etaHEN WebUI</a>
-      </div>
-      <p id="hostStatus" class="status"></p>
-    </section>
+    <section class="tools-grid">
+      <article class="panel equal-panel">
+        <p class="eyebrow">Target</p>
+        <h2>PS5 connection</h2>
 
-    <section class="card">
-      <h2>Send ELF payload</h2>
-      <p>Run Relapse on the PS5 first. After the ELF loader is listening, send a payload to port ${ps5ElfPort}.</p>
-      <label>ELF/BIN payload
-        <input id="elfFile" type="file" accept=".elf,.bin,application/octet-stream">
-      </label>
-      <button id="sendElf">Send payload</button>
-      <p id="elfStatus" class="status"></p>
-    </section>
+        <div class="field">
+          <label for="ps5Host">PS5 IP / host</label>
+          <input id="ps5Host" value="${escapedHost}" placeholder="192.168.1.110">
+        </div>
 
-    <section class="card">
-      <h2>etaHEN Direct PKG Installer</h2>
-      <p>Send any HTTP/HTTPS PKG URL to etaHEN on port ${ps5DpiPort}.</p>
-      <label>PKG URL
-        <input id="pkgUrl" placeholder="${escapeHtml(publicBaseUrl)}/pkgfiles/Game.pkg">
-      </label>
-      <button id="sendPkgUrl">Send install URL</button>
-      <p id="pkgStatus" class="status"></p>
+        <div class="button-row">
+          <button id="saveHost" type="button"><i class="fa-solid fa-floppy-disk"></i> Save PS5 IP</button>
+          <a id="etaHenWeb" class="button secondary" href="${etaHenWebUrl}" target="_blank" rel="noopener">
+            <i class="fa-solid fa-up-right-from-square"></i> Open etaHEN WebUI
+          </a>
+        </div>
+
+        <div id="hostStatus" class="status empty">Ready.</div>
+      </article>
+
+      <article class="panel equal-panel">
+        <p class="eyebrow">Relapse</p>
+        <h2>Local Relapse host</h2>
+        <p class="muted">Open this on the PS5 browser when you need to run the exploit / loader page.</p>
+        <div class="path-box">
+          Relapse folder:<br>
+          <code>${escapeHtml(ps5RelapseDir)}</code><br>
+          ${relapseAvailable ? '✅ found' : '⚠️ not found yet'}
+        </div>
+        <div class="button-row">
+          <a class="button" href="/ps5/relapse/" target="_blank" rel="noopener">
+            <i class="fa-solid fa-globe"></i> Open Relapse host
+          </a>
+        </div>
+      </article>
+
+      <article class="panel equal-panel">
+        <p class="eyebrow">Payload</p>
+        <h2>Send one-off ELF/BIN</h2>
+        <p class="muted">Run Relapse on the PS5 first. After the ELF loader is listening, send a payload to port ${ps5ElfPort}.</p>
+
+        <div class="field">
+          <label for="elfFile">ELF/BIN payload</label>
+          <input id="elfFile" type="file" accept=".elf,.bin,application/octet-stream">
+        </div>
+
+        <div class="button-row">
+          <button id="sendElf" class="green" type="button"><i class="fa-solid fa-paper-plane"></i> Send payload</button>
+          <a class="button secondary" href="/ps5/payloads"><i class="fa-solid fa-folder-open"></i> Payload manager</a>
+        </div>
+
+        <div id="elfStatus" class="status empty">Ready.</div>
+      </article>
+
+      <article class="panel equal-panel">
+        <p class="eyebrow">etaHEN</p>
+        <h2>Direct PKG Installer</h2>
+        <p class="muted">Send any HTTP/HTTPS PKG URL to etaHEN on port ${ps5DpiPort}.</p>
+
+        <div class="field">
+          <label for="pkgUrl">PKG URL</label>
+          <input id="pkgUrl" placeholder="${escapeHtml(publicBaseUrl)}/pkgfiles/ps5/Game.pkg">
+        </div>
+
+        <div class="button-row">
+          <button id="sendPkgUrl" type="button"><i class="fa-solid fa-download"></i> Send install URL</button>
+        </div>
+
+        <div id="pkgStatus" class="status empty">Ready.</div>
+      </article>
     </section>
   </main>
 
@@ -1746,6 +3708,12 @@ function renderPs5SupportPage() {
     const qs = (id) => document.getElementById(id);
 
     function host() { return qs('ps5Host').value.trim(); }
+
+    function setStatus(element, message, isError) {
+      element.textContent = message || '';
+      element.classList.toggle('empty', !message || message === 'Ready.');
+      element.style.color = isError ? '#fecaca' : '#7dd3fc';
+    }
 
     function updateEtaHenLink() {
       const value = host();
@@ -1755,23 +3723,23 @@ function renderPs5SupportPage() {
     qs('ps5Host').addEventListener('input', updateEtaHenLink);
 
     qs('saveHost').addEventListener('click', async () => {
-      qs('hostStatus').textContent = 'Saving...';
+      setStatus(qs('hostStatus'), 'Saving...', false);
       const res = await fetch('/api/ps5ip', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ newPS5ipadr: host() })
       });
       const data = await res.json();
-      qs('hostStatus').textContent = data.message || data.error || data.message || (res.ok ? 'Saved' : 'Failed');
+      setStatus(qs('hostStatus'), data.message || data.error || (res.ok ? 'Saved' : 'Failed'), !res.ok);
       updateEtaHenLink();
     });
 
     qs('sendElf').addEventListener('click', async () => {
       const file = qs('elfFile').files[0];
-      if (!host()) { qs('elfStatus').textContent = 'Missing PS5 IP.'; return; }
-      if (!file) { qs('elfStatus').textContent = 'Choose an ELF/BIN file first.'; return; }
+      if (!host()) { setStatus(qs('elfStatus'), 'Missing PS5 IP.', true); return; }
+      if (!file) { setStatus(qs('elfStatus'), 'Choose an ELF/BIN file first.', true); return; }
 
-      qs('elfStatus').textContent = 'Sending ' + file.name + '...';
+      setStatus(qs('elfStatus'), 'Sending ' + file.name + '...', false);
       try {
         const res = await fetch('/api/ps5/send-elf?host=' + encodeURIComponent(host()), {
           method: 'POST',
@@ -1779,18 +3747,18 @@ function renderPs5SupportPage() {
           body: await file.arrayBuffer()
         });
         const data = await res.json();
-        qs('elfStatus').textContent = data.message || (res.ok ? 'Payload sent.' : 'Failed.');
+        setStatus(qs('elfStatus'), data.message || (res.ok ? 'Payload sent.' : 'Failed.'), !res.ok);
       } catch (error) {
-        qs('elfStatus').textContent = error.message;
+        setStatus(qs('elfStatus'), error.message, true);
       }
     });
 
     qs('sendPkgUrl').addEventListener('click', async () => {
-      if (!host()) { qs('pkgStatus').textContent = 'Missing PS5 IP.'; return; }
+      if (!host()) { setStatus(qs('pkgStatus'), 'Missing PS5 IP.', true); return; }
       const url = qs('pkgUrl').value.trim();
-      if (!url) { qs('pkgStatus').textContent = 'Missing PKG URL.'; return; }
+      if (!url) { setStatus(qs('pkgStatus'), 'Missing PKG URL.', true); return; }
 
-      qs('pkgStatus').textContent = 'Sending install URL...';
+      setStatus(qs('pkgStatus'), 'Sending install URL...', false);
       try {
         const res = await fetch('/api/ps5/install-url', {
           method: 'POST',
@@ -1798,15 +3766,16 @@ function renderPs5SupportPage() {
           body: JSON.stringify({ host: host(), url })
         });
         const data = await res.json();
-        qs('pkgStatus').textContent = data.message || (res.ok ? 'Install URL sent.' : 'Failed.');
+        setStatus(qs('pkgStatus'), data.message || (res.ok ? 'Install URL sent.' : 'Failed.'), !res.ok);
       } catch (error) {
-        qs('pkgStatus').textContent = error.message;
+        setStatus(qs('pkgStatus'), error.message, true);
       }
     });
   </script>
 </body>
 </html>`;
 }
+
 
 function escapeHtml(value) {
   return String(value || '')
