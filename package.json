@@ -1,8 +1,8 @@
 {
-  "name": "ps4-pkg-sender",
+  "name": "ps4-ps5-pkg-sender",
   "version": "1.0.0",
   "private": true,
-  "description": "PS4 PKG Sender web UI",
+  "description": "PS4/PS5 PKG Sender web UI with PS5 Relapse/etaHEN helpers",
   "main": "src/app.js",
   "scripts": {
     "start": "node src/app.js",

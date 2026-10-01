@@ -11,7 +11,7 @@ FROM node:20-alpine
 
 WORKDIR /pkg_sender
 
-RUN apk --no-cache add curl
+RUN apk --no-cache add curl ca-certificates
 
 ENV NODE_ENV=production
 
