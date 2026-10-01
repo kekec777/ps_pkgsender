@@ -4,15 +4,31 @@ const mustacheExpress = require('mustache-express');
 const path = require('path');
 const fs = require('fs');
 const crypto = require('crypto');
+const net = require('net');
 const { execFile } = require('child_process');
 const filesizeModule = require('filesize');
 const formatFileSize = typeof filesizeModule === 'function' ? filesizeModule : filesizeModule.filesize;
 
 const port = Number(process.env.PORT || 7777);
-const staticFilesPath = path.resolve(
-  process.env.PKG_DIR || process.env.STATIC_FILES || './files'
+const ps4PkgPath = path.resolve(
+  process.env.PS4_PKG_DIR || process.env.PKG_DIR || process.env.STATIC_FILES || './PS4Games'
 );
+const ps5PkgPath = path.resolve(
+  process.env.PS5_PKG_DIR || './PS5Games'
+);
+
+// Backward-compatible name used by old helper functions and logs.
+const staticFilesPath = ps4PkgPath;
 const localIp = process.env.LOCALIP || 'localhost';
+const publicBaseUrl = String(process.env.PUBLIC_BASE_URL || `http://${localIp}:${port}`).replace(/\/$/, '');
+let currentPS5ipadr = process.env.PS5IP || process.env.PS5_HOST || '';
+const ps5ElfPort = Number.parseInt(process.env.PS5_ELF_PORT || '9021', 10);
+const ps5DpiPort = Number.parseInt(process.env.PS5_DPI_PORT || '9090', 10);
+const ps5DpiWebPort = Number.parseInt(process.env.PS5_DPI_WEB_PORT || '12800', 10);
+const ps5TcpTimeoutMs = Number.parseInt(process.env.PS5_TCP_TIMEOUT_MS || '30000', 10);
+const ps5RelapseDir = path.resolve(
+  process.env.PS5_RELAPSE_DIR || path.join(__dirname, 'public', 'ps5-relapse')
+);
 const coverImagesPath = path.join(__dirname, 'public', 'images');
 const thumbnailImagesPath = path.join(__dirname, 'public', 'thumbnail');
 const coverMapUrl = process.env.COVER_MAP_URL || 'https://raw.githubusercontent.com/hmn/ps4-imagemap/master/games.json';
@@ -138,7 +154,7 @@ function cleanCoverSearchTitle(value) {
   text = text.replace(/[A-Z]{2}\d{4}-[A-Z0-9]{4,10}\d{5}_00-[A-Z0-9_]+(?:-[A-Z]\d{4}-V\d{4})?/gi, ' ');
 
   // Remove title IDs after they were used for direct lookup.
-  text = text.replace(/\bCUSA\d{5}\b/gi, ' ');
+  text = text.replace(/\b(CUSA|PPSA)\d{5}\b/gi, ' ');
   text = text.replace(/\b(SLUS|SCUS|SCES|SLES|SLPS|SLPM|NPUJ|NPUI|NPEF|NPUG|NPEG|NPUB|NPEB|NPHG|ULUS|ULES|UCUS|UCES)[\s._-]*\d{5}\b/gi, ' ');
 
   // Turn separators into spaces, then apply common short-name expansions.
@@ -240,7 +256,12 @@ app.use('/css', express.static(path.join(__dirname, '../node_modules/bootstrap/d
 app.use('/js', express.static(path.join(__dirname, '../node_modules/bootstrap/dist/js')));
 app.use('/css', express.static(path.join(__dirname, 'views/css')));
 app.use('/public', express.static(path.join(__dirname, 'public')));
-app.use('/pkgfiles', express.static(staticFilesPath, { dotfiles: 'deny', fallthrough: false }));
+app.use('/ps5/relapse', express.static(ps5RelapseDir, { extensions: ['html'] }));
+app.use('/pkgfiles/ps4', express.static(ps4PkgPath, { dotfiles: 'deny', fallthrough: false }));
+app.use('/pkgfiles/ps5', express.static(ps5PkgPath, { dotfiles: 'deny', fallthrough: false }));
+
+// Legacy PS4 URL support. Existing PS4 installs using /pkgfiles/<file>.pkg still work.
+app.use('/pkgfiles', express.static(ps4PkgPath, { dotfiles: 'deny', fallthrough: false }));
 
 app.engine('html', mustacheExpress());
 app.set('view engine', 'html');
@@ -276,13 +297,70 @@ function withTimeout(promise, timeoutMs, message) {
 }
 
 
-app.get('/', (req, res, next) => {
+
+function makeSafeScriptJson(value) {
+  return JSON.stringify(value)
+    .replace(/</g, '\\u003c')
+    .replace(/>/g, '\\u003e')
+    .replace(/&/g, '\\u0026');
+}
+
+function getConsoleViewData(consoleType = 'ps4') {
+  const isPs5 = String(consoleType).toLowerCase() === 'ps5';
+  const label = isPs5 ? 'PS5' : 'PS4';
+
+  const config = {
+    type: isPs5 ? 'ps5' : 'ps4',
+    label,
+    ipApi: isPs5 ? '/api/ps5ip' : '/api/ps4ip',
+    ipFieldName: isPs5 ? 'newPS5ipadr' : 'newPS4ipadr',
+    installApi: isPs5 ? '/api/ps5/install' : '/install',
+    installLabel: isPs5 ? 'Install to PS5' : 'Install to PS4'
+  };
+
+  return {
+    isPs4: !isPs5,
+    isPs5,
+    pageTitle: `${label} PKG Sender`,
+    consoleBadge: `${label} PKG Sender`,
+    consoleTitle: `${label} package library`,
+    consoleDescription: isPs5
+      ? 'Browse PS4-compatible packages plus native PS5 packages, and send install URLs to your PS5 with etaHEN Direct PKG Installer.'
+      : 'Browse only PS4-compatible packages and send install requests to your PS4 without leaving the page.',
+    consoleTargetLabel: 'Target console',
+    consoleIpTitle: `${label} IP address`,
+    consoleIpPlaceholder: isPs5 ? '192.168.1.110' : '192.168.1.50',
+    currentConsoleLabel: label,
+    ipInputName: config.ipFieldName,
+    ipApi: config.ipApi,
+    installAction: config.installApi,
+    installButtonLabel: config.installLabel,
+    otherConsoleUrl: isPs5 ? '/ps4' : '/ps5',
+    otherConsoleLabel: isPs5 ? 'Open PS4 library' : 'Open PS5 library',
+    consoleSelectUrl: '/',
+    consoleToolsUrl: isPs5 ? '/ps5/tools' : '',
+    libraryModeLabel: isPs5 ? 'PS5 view: PS4 + PS5 packages' : 'PS4 view: PS4 packages only',
+    consoleConfigJson: makeSafeScriptJson(config),
+    ps5Host: currentPS5ipadr,
+    ps5RelapseUrl: '/ps5/relapse/',
+    ps5ToolsUrl: '/ps5/tools'
+  };
+}
+
+
+function getRequestedConsoleType(req) {
+  const value = String(req.query?.console || req.body?.console || req.query?.platform || req.body?.platform || 'ps4').toLowerCase();
+  return value === 'ps5' ? 'ps5' : 'ps4';
+}
+
+function renderPackageLibrary(req, res, next, consoleType = 'ps4') {
   try {
-    const dirs = flattenPkgs(getPkgs());
+    const dirs = flattenPkgs(getPkgsForConsole(consoleType));
     const totalPkgs = dirs.reduce((sum, dir) => sum + dir.count, 0);
     const totalBytes = dirs.reduce((sum, dir) => sum + dir.bytes, 0);
 
     res.render('index', {
+      ...getConsoleViewData(consoleType),
       dirs,
       hasDirs: dirs.length > 0,
       totalDirs: dirs.length,
@@ -292,6 +370,18 @@ app.get('/', (req, res, next) => {
   } catch (error) {
     next(error);
   }
+}
+
+app.get('/', (req, res) => {
+  res.type('html').send(renderConsoleSelectPage());
+});
+
+app.get('/ps4', (req, res, next) => {
+  renderPackageLibrary(req, res, next, 'ps4');
+});
+
+app.get('/ps5', (req, res, next) => {
+  renderPackageLibrary(req, res, next, 'ps5');
 });
 
 app.get('/api/ps4ip', (req, res) => {
@@ -309,12 +399,121 @@ app.post('/api/ps4ip', (req, res) => {
   res.json({ message: 'PS4 IP address updated', variable: currentPS4ipadr });
 });
 
+
+app.get('/api/ps5/info', (req, res) => {
+  res.json({
+    ok: true,
+    ps5Host: currentPS5ipadr,
+    ps5ElfPort,
+    ps5DpiPort,
+    ps5DpiWebPort,
+    publicBaseUrl,
+    relapseUrl: '/ps5/relapse/',
+    relapsePath: ps5RelapseDir,
+    relapseExists: fs.existsSync(ps5RelapseDir)
+  });
+});
+
+app.get('/api/ps5ip', (req, res) => {
+  res.json({ variable: currentPS5ipadr });
+});
+
+app.post('/api/ps5ip', (req, res) => {
+  const newPS5ipadr = String(req.body.newPS5ipadr || req.body.ps5Host || req.body.host || '').trim();
+
+  if (!isValidHost(newPS5ipadr)) {
+    return res.status(400).json({ message: 'Invalid PS5 IP/host' });
+  }
+
+  currentPS5ipadr = newPS5ipadr;
+  res.json({ message: 'PS5 IP address updated', variable: currentPS5ipadr });
+});
+
+app.post(
+  '/api/ps5/send-elf',
+  express.raw({ type: () => true, limit: process.env.PS5_PAYLOAD_LIMIT || '200mb' }),
+  async (req, res) => {
+    try {
+      const host = getRequiredPs5Host(req);
+      const portToUse = Number.parseInt(String(req.query.port || req.body?.port || ps5ElfPort), 10);
+
+      if (!Number.isInteger(portToUse) || portToUse <= 0 || portToUse > 65535) {
+        return res.status(400).json({ ok: false, message: 'Invalid PS5 ELF loader port' });
+      }
+
+      if (!Buffer.isBuffer(req.body) || req.body.length === 0) {
+        return res.status(400).json({ ok: false, message: 'Missing ELF/BIN payload body' });
+      }
+
+      const response = await sendTcpBuffer(host, portToUse, req.body, ps5TcpTimeoutMs);
+
+      res.json({
+        ok: true,
+        message: `Payload sent to ${host}:${portToUse}`,
+        bytes: req.body.length,
+        response
+      });
+    } catch (error) {
+      res.status(500).json({ ok: false, message: error.message });
+    }
+  }
+);
+
+app.post('/api/ps5/install-url', async (req, res) => {
+  try {
+    const host = getRequiredPs5Host(req);
+    const portToUse = Number.parseInt(String(req.body?.port || req.query.port || ps5DpiPort), 10);
+    const url = String(req.body?.url || '').trim();
+
+    if (!Number.isInteger(portToUse) || portToUse <= 0 || portToUse > 65535) {
+      return res.status(400).json({ ok: false, message: 'Invalid PS5 Direct PKG Installer port' });
+    }
+
+    if (!/^https?:\/\//i.test(url)) {
+      return res.status(400).json({ ok: false, message: 'Missing or invalid PKG URL' });
+    }
+
+    const result = await ps5InstallUrl(host, url, portToUse);
+    res.json(result);
+  } catch (error) {
+    res.status(500).json({ ok: false, message: error.message });
+  }
+});
+
+app.post('/api/ps5/install', async (req, res) => {
+  try {
+    const filepath = resolvePkgPathForConsole(req.body.filepath, 'ps5');
+    const host = getRequiredPs5Host(req);
+    const portToUse = Number.parseInt(String(req.body?.port || req.query.port || ps5DpiPort), 10);
+    const pkgUrl = buildPublicPkgUrl(filepath);
+    const result = await ps5InstallUrl(host, pkgUrl, portToUse);
+
+    res.json({
+      ...result,
+      package: path.basename(filepath),
+      url: pkgUrl
+    });
+  } catch (error) {
+    res.status(400).json({ ok: false, message: error.message });
+  }
+});
+
+app.get('/ps5/tools', (req, res) => {
+  res.type('html').send(renderPs5SupportPage());
+});
+
+app.get('/ps5/helper', (req, res) => {
+  res.redirect('/ps5/tools');
+});
+
 app.get('/api/covers/missing', (req, res, next) => {
   try {
-    const dirs = flattenPkgs(getPkgs());
+    const consoleType = getRequestedConsoleType(req);
+    const dirs = flattenPkgs(getPkgsForConsole(consoleType));
     const missing = getMissingCovers(dirs);
 
     res.json({
+      console: consoleType,
       missingCount: missing.length,
       missing
     });
@@ -348,14 +547,14 @@ function buildCoverDownloadResponse(checked, results = []) {
   };
 }
 
-async function runMissingCoverDownload(onProgress = null) {
+async function runMissingCoverDownload(onProgress = null, consoleType = 'ps4') {
   const emit = (payload) => {
     if (typeof onProgress === 'function') {
       onProgress(payload);
     }
   };
 
-  const dirs = flattenPkgs(getPkgs());
+  const dirs = flattenPkgs(getPkgsForConsole(consoleType));
   const missing = getMissingCovers(dirs);
 
   emit({
@@ -631,8 +830,9 @@ async function runMissingCoverDownload(onProgress = null) {
 
 app.post('/api/covers/download-missing', async (req, res) => {
   try {
-    const result = await runMissingCoverDownload();
-    res.json(result);
+    const consoleType = getRequestedConsoleType(req);
+    const result = await runMissingCoverDownload(null, consoleType);
+    res.json({ ...result, console: consoleType });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -666,7 +866,8 @@ app.get('/api/covers/download-missing/stream', async (req, res) => {
   };
 
   try {
-    await runMissingCoverDownload(send);
+    const consoleType = getRequestedConsoleType(req);
+    await runMissingCoverDownload(send, consoleType);
   } catch (error) {
     send({ kind: 'error', message: error.message });
   } finally {
@@ -693,7 +894,8 @@ app.use((err, req, res, next) => {
 });
 
 app.listen(port, () => {
-  console.log(`PS4 PKG sender listening on port ${port} serving files from ${staticFilesPath}`);
+  console.log(`PS4/PS5 PKG sender listening on port ${port} serving files from ${staticFilesPath}`);
+  console.log(`PS5 Relapse static path: ${ps5RelapseDir}`);
 });
 
 function flattenPkgs(pkgs) {
@@ -704,29 +906,67 @@ function flattenPkgs(pkgs) {
       rootPkgs.forEach((pkg) => {
         pkg.displayName = getPkgDisplayName(pkg);
         pkg.shortDisplayName = pkg.shortDisplayName || pkg.displayName;
+        pkg.platformLabel = pkg.platformLabel || 'PS4';
+        pkg.platform = String(pkg.platform || pkg.platformLabel).toLowerCase();
       });
       const bytes = rootPkgs.reduce((sum, pkg) => sum + pkg.bytes, 0);
-      const firstPkg = rootPkgs[0] || { imgname: 'folder.png' };
-      const folderThumbname = `${safeFileBase(root)}.jpg`;
+      const firstPkg = rootPkgs[0] || { imgname: 'folder.png', platformLabel: 'PS4', root };
+      const folderThumbBase = firstPkg.root || root;
+      const folderThumbname = `${safeFileBase(folderThumbBase)}.jpg`;
 
       return {
         id: crypto.randomUUID(),
         root,
         count: rootPkgs.length,
+        platformLabel: firstPkg.platformLabel || 'PS4',
+        platform: String(firstPkg.platform || firstPkg.platformLabel || 'ps4').toLowerCase(),
         bytes,
         folderImgname: firstPkg.imgname,
         folderThumbname,
         folderThumbUrl: encodePublicImageUrl('thumbnail', folderThumbname),
-        folderFallbackThumbUrl: encodePublicImageUrl('thumbnail', 'folder.png'),
+        folderFallbackThumbUrl: firstPkg.imgUrl || encodePublicImageUrl('images', firstPkg.imgname || 'folder.png'),
         pkgs: rootPkgs
       };
     });
 }
 
-function getPkgs() {
-  const filelist = {};
 
-  if (!fs.existsSync(staticFilesPath)) {
+function getPkgsForConsole(consoleType = 'ps4') {
+  const isPs5 = String(consoleType).toLowerCase() === 'ps5';
+
+  if (isPs5) {
+    return mergePkgMaps(
+      getPkgsFromRoot(ps4PkgPath, 'PS4', true),
+      getPkgsFromRoot(ps5PkgPath, 'PS5', true)
+    );
+  }
+
+  return getPkgsFromRoot(ps4PkgPath, 'PS4', false);
+}
+
+function mergePkgMaps(...maps) {
+  const merged = {};
+
+  maps.forEach((map) => {
+    Object.entries(map || {}).forEach(([root, pkgs]) => {
+      if (!merged[root]) merged[root] = [];
+      merged[root].push(...pkgs);
+    });
+  });
+
+  return merged;
+}
+
+function getPkgs() {
+  return getPkgsFromRoot(ps4PkgPath, 'PS4', false);
+}
+
+function getPkgsFromRoot(rootPath, platform = 'PS4', prefixRoot = false) {
+  const filelist = {};
+  const basePath = path.resolve(rootPath);
+  const platformLabel = String(platform || 'PS4').toUpperCase();
+
+  if (!fs.existsSync(basePath)) {
     return filelist;
   }
 
@@ -746,10 +986,16 @@ function getPkgs() {
       }
 
       const stat = fs.statSync(filepath);
-      const relativePath = path.relative(staticFilesPath, filepath);
-      const dirname = path.dirname(relativePath) === '.' ? 'Root' : path.dirname(relativePath);
-      const root = dirname.split(path.sep)[0] || 'Root';
+      const relativePath = path.relative(basePath, filepath);
+      const relativeDir = path.dirname(relativePath);
       const name = path.basename(filepath);
+      const fileBaseName = path.parse(name).name;
+
+      // If a PKG is placed directly in PS4Games/PS5Games, do not show it as "Root".
+      // Use the PKG filename without .pkg as the virtual folder name instead.
+      const dirname = relativeDir === '.' ? fileBaseName : relativeDir;
+      const rawRoot = relativeDir === '.' ? fileBaseName : (dirname.split(path.sep)[0] || fileBaseName || 'Root');
+      const root = prefixRoot ? `${platformLabel} / ${rawRoot}` : rawRoot;
 
       if (!filelist[root]) filelist[root] = [];
 
@@ -757,26 +1003,64 @@ function getPkgs() {
         filepath,
         relativePath,
         dir: dirname,
+        root: rawRoot,
+        displayRoot: root,
         name,
+        platform: platformLabel.toLowerCase(),
+        platformLabel,
+        libraryRoot: basePath,
+        pkgUrlPrefix: platformLabel.toLowerCase(),
         imgname: `${path.parse(filepath).name}.jpg`,
         imgUrl: encodePublicImageUrl('images', `${path.parse(filepath).name}.jpg`),
         size: formatFileSize(stat.size),
         bytes: stat.size,
-        searchText: `${root} ${dirname} ${name}`.toLowerCase()
+        searchText: `${platformLabel} ${root} ${dirname} ${name}`.toLowerCase()
       });
     });
   }
 
-  walkSync(staticFilesPath);
+  walkSync(basePath);
   return filelist;
 }
 
-function resolvePkgPath(filepath) {
+function getPkgLibraryInfo(filepath) {
   const requestedPath = path.resolve(String(filepath || ''));
-  const relative = path.relative(staticFilesPath, requestedPath);
+  const candidates = [
+    { root: ps4PkgPath, platform: 'ps4', platformLabel: 'PS4' },
+    { root: ps5PkgPath, platform: 'ps5', platformLabel: 'PS5' }
+  ];
 
-  if (!requestedPath || relative.startsWith('..') || path.isAbsolute(relative)) {
+  for (const candidate of candidates) {
+    const rootPath = path.resolve(candidate.root);
+    const relative = path.relative(rootPath, requestedPath);
+
+    if (requestedPath && !relative.startsWith('..') && !path.isAbsolute(relative)) {
+      return {
+        ...candidate,
+        root: rootPath,
+        relative
+      };
+    }
+  }
+
+  return null;
+}
+
+function resolvePkgPathForConsole(filepath, consoleType = 'ps4') {
+  const requestedPath = path.resolve(String(filepath || ''));
+  const info = getPkgLibraryInfo(requestedPath);
+  const targetConsole = String(consoleType || 'ps4').toLowerCase();
+
+  if (!info) {
     throw new Error('Invalid package path');
+  }
+
+  if (targetConsole === 'ps4' && info.platform !== 'ps4') {
+    throw new Error('PS4 view can only install packages from PS4Games');
+  }
+
+  if (targetConsole === 'ps5' && !['ps4', 'ps5'].includes(info.platform)) {
+    throw new Error('PS5 view can only install packages from PS4Games or PS5Games');
   }
 
   if (path.extname(requestedPath).toLowerCase() !== '.pkg' || !fs.existsSync(requestedPath)) {
@@ -786,16 +1070,34 @@ function resolvePkgPath(filepath) {
   return requestedPath;
 }
 
-function encodeRelativeUrl(filepath) {
-  return path.relative(staticFilesPath, filepath)
+function resolvePkgPath(filepath) {
+  return resolvePkgPathForConsole(filepath, 'ps4');
+}
+
+function encodeRelativeUrlForRoot(rootPath, filepath) {
+  return path.relative(rootPath, filepath)
     .split(path.sep)
     .map(encodeURIComponent)
     .join('/');
 }
 
+function encodeRelativeUrl(filepath) {
+  return encodeRelativeUrlForRoot(ps4PkgPath, filepath);
+}
+
+function buildPublicPkgUrl(filepath) {
+  const info = getPkgLibraryInfo(filepath);
+
+  if (!info) {
+    throw new Error('Invalid package path');
+  }
+
+  return `${publicBaseUrl}/pkgfiles/${info.platform}/${encodeRelativeUrlForRoot(info.root, filepath)}`;
+}
+
 function ps4Install(filepath) {
   return new Promise((resolve, reject) => {
-    const pkgUri = `http://${localIp}:${port}/pkgfiles/${encodeRelativeUrl(filepath)}`;
+    const pkgUri = buildPublicPkgUrl(filepath);
     const ps4ApiUri = `http://${currentPS4ipadr}:12800/api/install`;
     const payload = JSON.stringify({ type: 'direct', packages: [pkgUri] });
 
@@ -807,11 +1109,491 @@ function ps4Install(filepath) {
       resolve({
         message: `Install request sent for ${path.basename(filepath)}`,
         package: path.basename(filepath),
+        url: pkgUri,
         stdout,
         stderr
       });
     });
   });
+}
+
+function getRequiredPs5Host(req) {
+  const host = String(req.body?.host || req.query?.host || currentPS5ipadr || '').trim();
+
+  if (!host) {
+    throw new Error('Missing PS5 host/IP. Set PS5IP/PS5_HOST, update /api/ps5ip, or pass host.');
+  }
+
+  if (!isValidHost(host)) {
+    throw new Error('Invalid PS5 IP/host');
+  }
+
+  return host;
+}
+
+function sendTcpBuffer(host, portNumber, buffer, timeoutMs = ps5TcpTimeoutMs) {
+  return new Promise((resolve, reject) => {
+    const socket = new net.Socket();
+    let response = Buffer.alloc(0);
+    let finished = false;
+
+    const done = (error, result = '') => {
+      if (finished) return;
+      finished = true;
+      socket.destroy();
+
+      if (error) {
+        reject(error);
+      } else {
+        resolve(result);
+      }
+    };
+
+    socket.setTimeout(timeoutMs);
+
+    socket.on('data', (chunk) => {
+      response = Buffer.concat([response, chunk]);
+    });
+
+    socket.on('timeout', () => {
+      done(new Error(`TCP timeout connecting to ${host}:${portNumber}`));
+    });
+
+    socket.on('error', done);
+
+    socket.on('close', () => {
+      done(null, response.toString('utf8').trim());
+    });
+
+    socket.connect(portNumber, host, () => {
+      socket.write(buffer);
+      socket.end();
+    });
+  });
+}
+
+async function ps5InstallUrl(host, url, portToUse = ps5DpiPort) {
+  const payload = Buffer.from(JSON.stringify({ url }), 'utf8');
+  const response = await sendTcpBuffer(host, portToUse, payload, ps5TcpTimeoutMs);
+
+  return {
+    ok: true,
+    message: `Install URL sent to PS5 ${host}:${portToUse}`,
+    url,
+    response
+  };
+}
+
+
+function renderConsoleSelectPage() {
+  const ps5RelapseAvailable = fs.existsSync(ps5RelapseDir);
+
+  return `<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>PKG Sender</title>
+  <link rel="stylesheet" href="/css/fontawesome.min.css">
+  <link rel="stylesheet" href="/css/solid.min.css">
+  <style>
+    :root {
+      --bg: #07111f;
+      --panel: rgba(15, 23, 42, 0.86);
+      --border: rgba(255,255,255,0.14);
+      --text: #eef3ff;
+      --muted: #a9b8d4;
+      --blue: #3b82f6;
+      --cyan: #06b6d4;
+      --green: #22c55e;
+      --shadow: 0 30px 100px rgba(0,0,0,.45);
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      min-height: 100vh;
+      margin: 0;
+      color: var(--text);
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background:
+        radial-gradient(circle at 16% 12%, rgba(59,130,246,.28), transparent 34rem),
+        radial-gradient(circle at 84% 16%, rgba(34,197,94,.18), transparent 32rem),
+        linear-gradient(135deg, #050914, var(--bg));
+    }
+
+    main {
+      min-height: 100vh;
+      width: min(1180px, calc(100% - 32px));
+      margin: 0 auto;
+      display: grid;
+      place-items: center;
+      padding: 32px 0;
+    }
+
+    .landing-wrap {
+      width: 100%;
+    }
+
+    .landing-hero {
+      margin-bottom: 22px;
+      text-align: center;
+    }
+
+    .eyebrow {
+      margin: 0 0 12px;
+      color: #7dd3fc;
+      font-size: .78rem;
+      font-weight: 950;
+      letter-spacing: .18em;
+      text-transform: uppercase;
+    }
+
+    h1 {
+      margin: 0 0 14px;
+      font-size: clamp(3.4rem, 9vw, 7.6rem);
+      line-height: .9;
+      letter-spacing: -.07em;
+      text-shadow: 0 16px 58px rgba(0,0,0,.48);
+    }
+
+    .landing-hero p {
+      max-width: 760px;
+      margin: 0 auto;
+      color: var(--muted);
+      font-size: clamp(1rem, 1.7vw, 1.25rem);
+      line-height: 1.6;
+    }
+
+    .console-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 22px;
+      margin-top: 32px;
+    }
+
+    .console-button {
+      position: relative;
+      min-height: 330px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      overflow: hidden;
+      padding: 28px;
+      color: var(--text);
+      text-decoration: none;
+      border: 1px solid var(--border);
+      border-radius: 30px;
+      background: var(--panel);
+      box-shadow: var(--shadow);
+      transition: transform .18s ease, border-color .18s ease, background .18s ease;
+      isolation: isolate;
+    }
+
+    .console-button::before {
+      content: "";
+      position: absolute;
+      inset: -40%;
+      z-index: -1;
+      opacity: .72;
+      background:
+        radial-gradient(circle at 20% 22%, rgba(59,130,246,.42), transparent 35%),
+        radial-gradient(circle at 80% 78%, rgba(14,165,233,.28), transparent 36%);
+      transition: transform .25s ease, opacity .18s ease;
+    }
+
+    .console-button.ps5::before {
+      background:
+        radial-gradient(circle at 20% 22%, rgba(34,197,94,.34), transparent 35%),
+        radial-gradient(circle at 80% 78%, rgba(6,182,212,.28), transparent 36%);
+    }
+
+    .console-button:hover {
+      transform: translateY(-5px);
+      border-color: rgba(125,211,252,.42);
+      background: rgba(15, 23, 42, .94);
+    }
+
+    .console-button:hover::before {
+      opacity: 1;
+      transform: scale(1.05);
+    }
+
+    .console-logo {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: min(100%, 380px);
+      min-height: 130px;
+      color: #fff;
+      font-size: clamp(5rem, 14vw, 8.6rem);
+      font-weight: 1000;
+      letter-spacing: -.12em;
+      line-height: .85;
+      text-shadow: 0 18px 58px rgba(0,0,0,.54);
+    }
+
+    .console-logo span {
+      letter-spacing: -.04em;
+    }
+
+    .console-title {
+      margin-top: 20px;
+    }
+
+    .console-title h2 {
+      margin: 0 0 10px;
+      font-size: clamp(1.8rem, 4vw, 2.8rem);
+      line-height: 1;
+    }
+
+    .console-title p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 1rem;
+      line-height: 1.55;
+    }
+
+    .console-meta {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-top: 20px;
+    }
+
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 12px;
+      color: #e0f2fe;
+      background: rgba(255,255,255,.08);
+      border: 1px solid rgba(255,255,255,.14);
+      border-radius: 999px;
+      font-size: .86rem;
+      font-weight: 850;
+    }
+
+    .landing-footer {
+      margin-top: 20px;
+      display: flex;
+      justify-content: center;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .small-link {
+      color: #bae6fd;
+      text-decoration: none;
+      font-weight: 800;
+    }
+
+    .small-link:hover { text-decoration: underline; }
+
+    @media (max-width: 820px) {
+      .console-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .console-button {
+        min-height: 260px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <section class="landing-wrap">
+      <div class="landing-hero">
+        <p class="eyebrow">PKG Sender</p>
+        <h1>Choose console</h1>
+        <p>Select the console you want to manage. PS4 shows only PS4Games. PS5 shows PS4Games plus PS5Games and sends install URLs through etaHEN Direct PKG Installer.</p>
+      </div>
+
+      <div class="console-grid">
+        <a class="console-button ps4" href="/ps4" aria-label="Open PS4 package library">
+          <div>
+            <div class="console-logo">PS<span>4</span></div>
+            <div class="console-title">
+              <h2>PS4 library</h2>
+              <p>Browse your packages and send install requests to your PS4.</p>
+            </div>
+          </div>
+          <div class="console-meta">
+            <span class="pill"><i class="fa-solid fa-cloud-arrow-down"></i> Port 12800</span>
+            <span class="pill">Package installer</span>
+          </div>
+        </a>
+
+        <a class="console-button ps5" href="/ps5" aria-label="Open PS5 package library">
+          <div>
+            <div class="console-logo">PS<span>5</span></div>
+            <div class="console-title">
+              <h2>PS5 library</h2>
+              <p>Browse PS4-compatible packages and native PS5 packages, then send install URLs with etaHEN DPI.</p>
+            </div>
+          </div>
+          <div class="console-meta">
+            <span class="pill"><i class="fa-solid fa-bolt"></i> Relapse ${ps5RelapseAvailable ? 'ready' : 'missing'}</span>
+            <span class="pill">DPI ${ps5DpiPort}</span>
+          </div>
+        </a>
+      </div>
+
+      <div class="landing-footer">
+        <a class="small-link" href="/ps5/tools">PS5 Relapse tools</a>
+        <span style="color:rgba(255,255,255,.24)">•</span>
+        <a class="small-link" href="/ps5/relapse/">Open Relapse host</a>
+      </div>
+    </section>
+  </main>
+</body>
+</html>`;
+}
+
+
+function renderPs5SupportPage() {
+  const escapedHost = escapeHtml(currentPS5ipadr || '');
+  const relapseAvailable = fs.existsSync(ps5RelapseDir);
+  const etaHenWebUrl = currentPS5ipadr ? `http://${escapeHtml(currentPS5ipadr)}:${ps5DpiWebPort}` : '#';
+
+  return `<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>PS5 Relapse Support - PKG Sender</title>
+  <style>
+    body { margin: 0; min-height: 100vh; font-family: system-ui, -apple-system, Segoe UI, sans-serif; color: #eef3ff; background: radial-gradient(circle at top left, rgba(59,130,246,.28), transparent 32rem), #07111f; }
+    main { width: min(980px, calc(100% - 28px)); margin: 0 auto; padding: 28px 0 60px; }
+    .card { margin: 0 0 18px; padding: 22px; border: 1px solid rgba(255,255,255,.14); border-radius: 20px; background: rgba(15,23,42,.88); box-shadow: 0 22px 80px rgba(0,0,0,.35); }
+    h1 { margin: 0 0 10px; font-size: clamp(2.2rem, 6vw, 4rem); line-height: .95; }
+    h2 { margin: 0 0 14px; }
+    p { color: #a9b8d4; line-height: 1.55; }
+    label { display: grid; gap: 8px; margin: 12px 0; font-weight: 800; color: #cbd5e1; }
+    input { min-height: 46px; padding: 8px 12px; border-radius: 12px; border: 1px solid rgba(255,255,255,.18); color: #fff; background: rgba(255,255,255,.08); }
+    button, a.button { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 44px; padding: 0 16px; border: 0; border-radius: 12px; color: #fff; background: #2563eb; font-weight: 900; text-decoration: none; cursor: pointer; }
+    button.secondary, a.secondary { background: rgba(255,255,255,.10); border: 1px solid rgba(255,255,255,.16); }
+    .row { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }
+    .status { min-height: 24px; color: #7dd3fc; font-weight: 800; }
+    code { color: #93c5fd; }
+  </style>
+</head>
+<body>
+  <main>
+    <section class="card">
+      <h1>PS5 Relapse Support</h1>
+      <p>Host the Relapse page locally, send ELF/BIN payloads to the PS5 ELF loader, and send PKG URLs to etaHEN Direct PKG Installer.</p>
+      <p>Relapse folder: <code>${escapeHtml(ps5RelapseDir)}</code> ${relapseAvailable ? '✅ found' : '⚠️ not found yet'}</p>
+    </section>
+
+    <section class="card">
+      <h2>PS5 connection</h2>
+      <label>PS5 IP / host
+        <input id="ps5Host" value="${escapedHost}" placeholder="192.168.1.110">
+      </label>
+      <div class="row">
+        <button id="saveHost">Save PS5 IP</button>
+        <a class="button secondary" href="/ps5/relapse/" target="_blank" rel="noopener">Open Relapse host</a>
+        <a id="etaHenWeb" class="button secondary" href="${etaHenWebUrl}" target="_blank" rel="noopener">Open etaHEN WebUI</a>
+      </div>
+      <p id="hostStatus" class="status"></p>
+    </section>
+
+    <section class="card">
+      <h2>Send ELF payload</h2>
+      <p>Run Relapse on the PS5 first. After the ELF loader is listening, send a payload to port ${ps5ElfPort}.</p>
+      <label>ELF/BIN payload
+        <input id="elfFile" type="file" accept=".elf,.bin,application/octet-stream">
+      </label>
+      <button id="sendElf">Send payload</button>
+      <p id="elfStatus" class="status"></p>
+    </section>
+
+    <section class="card">
+      <h2>etaHEN Direct PKG Installer</h2>
+      <p>Send any HTTP/HTTPS PKG URL to etaHEN on port ${ps5DpiPort}.</p>
+      <label>PKG URL
+        <input id="pkgUrl" placeholder="${escapeHtml(publicBaseUrl)}/pkgfiles/Game.pkg">
+      </label>
+      <button id="sendPkgUrl">Send install URL</button>
+      <p id="pkgStatus" class="status"></p>
+    </section>
+  </main>
+
+  <script>
+    const qs = (id) => document.getElementById(id);
+
+    function host() { return qs('ps5Host').value.trim(); }
+
+    function updateEtaHenLink() {
+      const value = host();
+      qs('etaHenWeb').href = value ? 'http://' + value + ':${ps5DpiWebPort}' : '#';
+    }
+
+    qs('ps5Host').addEventListener('input', updateEtaHenLink);
+
+    qs('saveHost').addEventListener('click', async () => {
+      qs('hostStatus').textContent = 'Saving...';
+      const res = await fetch('/api/ps5ip', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ newPS5ipadr: host() })
+      });
+      const data = await res.json();
+      qs('hostStatus').textContent = data.message || data.error || data.message || (res.ok ? 'Saved' : 'Failed');
+      updateEtaHenLink();
+    });
+
+    qs('sendElf').addEventListener('click', async () => {
+      const file = qs('elfFile').files[0];
+      if (!host()) { qs('elfStatus').textContent = 'Missing PS5 IP.'; return; }
+      if (!file) { qs('elfStatus').textContent = 'Choose an ELF/BIN file first.'; return; }
+
+      qs('elfStatus').textContent = 'Sending ' + file.name + '...';
+      try {
+        const res = await fetch('/api/ps5/send-elf?host=' + encodeURIComponent(host()), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/octet-stream' },
+          body: await file.arrayBuffer()
+        });
+        const data = await res.json();
+        qs('elfStatus').textContent = data.message || (res.ok ? 'Payload sent.' : 'Failed.');
+      } catch (error) {
+        qs('elfStatus').textContent = error.message;
+      }
+    });
+
+    qs('sendPkgUrl').addEventListener('click', async () => {
+      if (!host()) { qs('pkgStatus').textContent = 'Missing PS5 IP.'; return; }
+      const url = qs('pkgUrl').value.trim();
+      if (!url) { qs('pkgStatus').textContent = 'Missing PKG URL.'; return; }
+
+      qs('pkgStatus').textContent = 'Sending install URL...';
+      try {
+        const res = await fetch('/api/ps5/install-url', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ host: host(), url })
+        });
+        const data = await res.json();
+        qs('pkgStatus').textContent = data.message || (res.ok ? 'Install URL sent.' : 'Failed.');
+      } catch (error) {
+        qs('pkgStatus').textContent = error.message;
+      }
+    });
+  </script>
+</body>
+</html>`;
+}
+
+function escapeHtml(value) {
+  return String(value || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
 }
 
 
@@ -846,8 +1628,8 @@ function getMissingCovers(dirs) {
           name: pkg.name,
           package: pkg.name,
           targetName: pkg.imgname,
-          lookupText: `${dir.root} ${pkg.dir} ${pkg.name}`,
-          searchTitle: buildSearchTitle(dir.root, pkg.name)
+          lookupText: `${dir.root} ${pkg.root || ''} ${pkg.dir} ${pkg.name}`,
+          searchTitle: buildSearchTitle(pkg.root || dir.root, pkg.name)
         });
       }
     });
@@ -974,8 +1756,8 @@ function extractAllTitleIds(value) {
   const text = String(value || '');
   const ids = [];
 
-  // PS4 CUSA IDs. Use custom boundaries so IDs after underscores are detected.
-  for (const match of text.matchAll(/(^|[^A-Z0-9])(CUSA\d{5})(?=$|[^A-Z0-9])/gi)) {
+  // PS4 CUSA and PS5 PPSA IDs. Use custom boundaries so IDs after underscores are detected.
+  for (const match of text.matchAll(/(^|[^A-Z0-9])((?:CUSA|PPSA)\d{5})(?=$|[^A-Z0-9])/gi)) {
     ids.push(match[2].toUpperCase());
   }
 
@@ -993,6 +1775,14 @@ function isCusaTitleId(titleId) {
   return /^CUSA\d{5}$/i.test(String(titleId || ''));
 }
 
+function isPpsaTitleId(titleId) {
+  return /^PPSA\d{5}$/i.test(String(titleId || ''));
+}
+
+function isPlayStationStoreTitleId(titleId) {
+  return /^(CUSA|PPSA)\d{5}$/i.test(String(titleId || ''));
+}
+
 function isSerialStationTitleId(titleId) {
   return /^(CUSA|SLUS|SCUS|SCES|SLES|SLPS|SLPM|NPUJ|NPUI|NPEF|NPUG|NPEG|NPUB|NPEB|NPHG|ULUS|ULES|UCUS|UCES)\d{5}$/i.test(String(titleId || ''));
 }
@@ -1000,7 +1790,7 @@ function isSerialStationTitleId(titleId) {
 
 function extractTitleId(value) {
   const ids = extractAllTitleIds(value);
-  return ids.find((id) => isCusaTitleId(id)) || ids[0] || null;
+  return ids.find((id) => isPlayStationStoreTitleId(id)) || ids[0] || null;
 }
 
 function extractLegacyTitleId(value) {
@@ -1038,23 +1828,24 @@ async function loadCoverMap() {
 async function findCoverUrl(titleId, coverMap, item = {}) {
   const lookupText = item.lookupText || '';
   const allTitleIds = extractAllTitleIds(lookupText);
+  const playStationStoreTitleIds = allTitleIds.filter((id) => isPlayStationStoreTitleId(id));
   const cusaTitleIds = allTitleIds.filter((id) => isCusaTitleId(id));
   const serialTitleIds = allTitleIds.filter((id) => isSerialStationTitleId(id));
   const contentId = extractContentId(lookupText);
   const searchTitle = item.searchTitle || cleanGameTitle(lookupText);
   const tried = [];
 
-  // 1. GitHub cover map and PlayStation Store for CUSA IDs.
-  for (const cusaId of cusaTitleIds) {
-    if (coverMap && coverMap[cusaId]) {
+  // 1. GitHub cover map for CUSA IDs and PlayStation Store for CUSA/PPSA IDs.
+  for (const storeTitleId of playStationStoreTitleIds) {
+    if (isCusaTitleId(storeTitleId) && coverMap && coverMap[storeTitleId]) {
       return {
-        url: coverMap[cusaId],
+        url: coverMap[storeTitleId],
         source: 'github-cover-map'
       };
     }
 
-    const storeResult = await findCoverUrlFromPlayStationStore(cusaId);
-    tried.push(`PlayStation Store ${cusaId}: ${storeResult.reason || (storeResult.url ? 'ok' : 'no result')}`);
+    const storeResult = await findCoverUrlFromPlayStationStore(storeTitleId);
+    tried.push(`PlayStation Store ${storeTitleId}: ${storeResult.reason || (storeResult.url ? 'ok' : 'no result')}`);
 
     if (storeResult.url) {
       return storeResult;
