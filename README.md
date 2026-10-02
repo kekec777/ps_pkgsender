@@ -1,622 +1,427 @@
-# PS4 / PS5 PKG Sender
+# PS PKG Sender
 
-A web-based PKG sender for browsing local `.pkg` files, sending install requests to a PlayStation 4, and using PS5 Relapse / etaHEN helper workflows on your own local network.
+Modern local web UI for managing PlayStation package files, PS5 payloads, PS5Upload installs, PS2 games for PS5SX2/PCSX2, and Nintendo Switch files for ProsperoEden.
 
-This project is a fork of [`justanormaldev/ps4-pkg-sender`](https://github.com/justanormaldev/ps4-pkg-sender), with extra UI improvements, folder thumbnails, cover downloading, Docker support, PS4/PS5 library separation, and better handling for large local PKG libraries.
+This project is designed for a trusted LAN setup. It is not intended to be exposed directly to the public internet.
+
+---
 
 ## Features
 
-- Console selection page at `/`
-- PS4 package library at `/ps4`
-- PS5 package library at `/ps5`
-- PS5 helper page at `/ps5/tools`
-- Relapse static host at `/ps5/relapse/`
-- PS4 library shows only PS4 packages
-- PS5 library can show PS4 packages, PS5 packages, or both with checkboxes
-- Folder-based package library view
-- Folder thumbnails from `src/public/thumbnail/`
-- PKG/game cover images from `src/public/images/`
-- Strict separation between folder thumbnails and package cover images
-- Download missing covers button
-- Live debug toggle for cover downloads
-- Timeout handling so one slow cover source does not stop the whole scan
-- Docker and Docker Compose support
-- PS5 ELF/BIN payload sender for the Relapse/etaHEN ELF loader
-- etaHEN Direct PKG Installer URL sender
+### Package library
 
-## Web routes
+- PS4 library page
+- PS5 library page
+- PS5 page can show or hide:
+  - PS4 packages
+  - PS5 packages
+  - PS2 games
+  - Nintendo Switch games
+- Folder-style cards with package/game lists
+- Cover and thumbnail support
+- Size statistics and package counts
+- Manual refresh flow after new covers are downloaded
 
-| Route | Purpose |
+### PS4 installs
+
+- Send PS4 `.pkg` files to the PS4 Direct Package Installer.
+- Uses the configured PS4 host/IP.
+
+### PS5 installs
+
+- Direct PS5 package install through the integrated PS5Upload engine.
+- Uses PS5Upload `/api/pkg/install`.
+- Sends host-side package files using the `host_file` source format.
+- Install queue support.
+- etaHEN Direct Package Installer mode can still be used by setting `PS5_INSTALL_MODE=etahen`.
+
+### PS5Upload integration
+
+- Integrated PS5Upload engine/web UI in the same container.
+- PS5Upload Web UI available through the configured `PS5UPLOAD_WEB_URL`.
+- PKG Sender uses the local internal PS5Upload API for installs and transfers.
+- PS5Upload can be used to transfer folders and files to the PS5 without FTP.
+
+### Payload / ELF manager
+
+- Upload `.elf`, `.bin`, and `.payload` files.
+- Send payload files to the PS5 ELF loader port, usually `9021`.
+- Helper text explains that `elfldr / ELF loader` must be loaded before sending payloads.
+- Optional Payload Manager 8084 integration.
+- Payloads can be synced into the PS5 Payload Manager storage path.
+
+### Homebrew app manager
+
+- Upload and extract PS5 homebrew ZIP files.
+- Deploy extracted homebrew folders through PS5Upload.
+- Default target:
+
+```text
+/data/homebrew/<folder>
+```
+
+### PS2 / PS5SX2 support
+
+- PS2 games can be shown on the PS5 page.
+- Supported extensions by default:
+
+```text
+.iso, .chd, .cso, .bin, .img, .mdf, .nrg, .gz
+```
+
+- PS2 games are uploaded through PS5Upload to:
+
+```text
+/data/PCSX2/games
+```
+
+### PS5SX2 BIOS manager
+
+- Dedicated page for uploading BIOS files to the PS5.
+- Default target:
+
+```text
+/data/PCSX2/bios
+```
+
+- Supported BIOS extensions by default:
+
+```text
+.bin, .rom, .erom, .nvm, .mec, .zip, .txt
+```
+
+### Nintendo Switch / ProsperoEden support
+
+- Nintendo Switch games can be shown on the PS5 page.
+- Supported extensions by default:
+
+```text
+.nsp, .xci, .nsz, .xcz
+```
+
+- Switch games are uploaded through PS5Upload to:
+
+```text
+/data/prosperoeden/roms
+```
+
+### Nintendo Switch / ProsperoEden manager page
+
+Dedicated page for uploading your own legally dumped files to:
+
+```text
+/data/prosperoeden/keys
+/data/prosperoeden/firmware
+/data/prosperoeden/updates
+/data/prosperoeden/mods
+```
+
+This project does not include or provide console keys, firmware, BIOS files, ROMs, ISOs, packages, or commercial games.
+
+---
+
+## Pages
+
+| Page | Purpose |
 |---|---|
-| `/` | Console selector with PS4 and PS5 buttons |
+| `/` | Main console select page |
 | `/ps4` | PS4 package library |
-| `/ps5` | PS5 package library |
-| `/ps5/tools` | PS5 Relapse / etaHEN helper tools |
-| `/ps5/helper` | Redirects to `/ps5/tools` |
-| `/ps5/relapse/` | Locally hosted Relapse files |
-| `/api/ps4ip` | Get/update PS4 IP |
-| `/api/ps5ip` | Get/update PS5 IP |
-| `/api/ps5/info` | PS5 configuration/status info |
-| `/api/covers/missing?console=ps4` | Check missing covers for PS4 view |
-| `/api/covers/missing?console=ps5` | Check missing covers for PS5 view |
-| `/api/covers/download-missing?console=ps4` | Download missing covers for PS4 view |
-| `/api/covers/download-missing?console=ps5` | Download missing covers for PS5 view |
-| `/install` | Send install request to PS4 package installer |
-| `/api/ps5/install` | Send install URL to PS5 etaHEN Direct PKG Installer |
-| `/api/ps5/install-url` | Send a custom PKG URL to PS5 etaHEN Direct PKG Installer |
-| `/api/ps5/send-elf` | Send an ELF/BIN payload to the PS5 ELF loader |
+| `/ps5` | PS5 library with PS4, PS5, PS2, and Switch sections |
+| `/ps5/payloads` | Payload / ELF manager |
+| `/ps5/homebrew` | PS5 homebrew ZIP manager |
+| `/ps5/ps5sx2` | PS5SX2 BIOS manager |
+| `/ps5/nintendoswitch` | ProsperoEden keys, firmware, updates, and mods manager |
+| `/ps5/tools` | Relapse / etaHEN tools |
+| `/ps5upload` | Integrated PS5Upload Web UI redirect |
 
-## Library behavior
+---
 
-### PS4 view
+## Required Docker volumes
 
-The PS4 view is available at:
+Add the volumes you use under the `pkgsender` service.
 
-```text
-/ps4
+```yaml
+volumes:
+  - /srv/dev-disk-by-uuid-1e475b37-0545-4435-87c9-c7b04fe4843b/Playstation/PS4/Games/:/pkg_sender/PS4Games
+  - /srv/dev-disk-by-uuid-1e475b37-0545-4435-87c9-c7b04fe4843b/Playstation/PS5/Games/:/pkg_sender/PS5Games
+  - /srv/dev-disk-by-uuid-1e475b37-0545-4435-87c9-c7b04fe4843b/Playstation/PS2/Games/:/pkg_sender/PS2Games
+  - /srv/dev-disk-by-uuid-d71ad254-1858-41fe-8122-e350ef379c4d/Nintendo/Switch/Games/:/pkg_sender/SwitchGames
+  - /srv/dev-disk-by-uuid-2d63569d-15a7-41a3-8009-e9b487095e11/dockercompose/dockerfiles/pkgsender/src:/pkg_sender/src
 ```
 
-It shows only packages from:
+The `src` bind mount means frontend and backend source changes are loaded from the host path.
 
-```text
-/pkg_sender/PS4Games
-```
-
-Install requests from this page go to the PS4 package installer endpoint.
-
-### PS5 view
-
-The PS5 view is available at:
-
-```text
-/ps5
-```
-
-It can show packages from both:
-
-```text
-/pkg_sender/PS4Games
-/pkg_sender/PS5Games
-```
-
-The PS5 page has checkboxes:
-
-```text
-[x] PS4 games
-[x] PS5 games
-```
-
-Behavior:
-
-```text
-PS4 games checked only = show only PS4 packages
-PS5 games checked only = show only PS5 packages
-Both checked = show both PS4 and PS5 packages
-```
-
-Install requests from this page go to etaHEN Direct PKG Installer.
-
-## Recommended folder layout
-
-Recommended container layout:
-
-```text
-/pkg_sender/
-├── PS4Games/
-│   ├── Alan_Wake_Remastered_CUSA24653/
-│   │   ├── Alan_Wake_Remastered_CUSA24653.pkg
-│   │   └── Alan_Wake_Remastered_UPD_v1_03_CUSA24653.pkg
-│   └── 00_Tools/
-│       └── Some_PS4_Tool.pkg
-├── PS5Games/
-│   ├── Astro_Bot_PPSA21497/
-│   │   └── Astro_Bot_PPSA21497.pkg
-│   └── God_of_war_-_sons_of_sparta.pkg
-└── src/
-    └── public/
-        ├── images/
-        ├── thumbnail/
-        ├── theme-images/
-        └── ps5-relapse/
-```
-
-If a `.pkg` file is placed directly inside `PS4Games` or `PS5Games`, the app uses the filename without `.pkg` as the virtual folder name instead of showing it as `Root`.
-
-Example:
-
-```text
-/pkg_sender/PS5Games/God of war - sons of sparta.pkg
-```
-
-will be shown as:
-
-```text
-PS5 / God of war - sons of sparta
-```
-
-not:
-
-```text
-PS5 / Root
-```
-
-## Images and thumbnails
-
-Package cover images are saved to:
-
-```text
-src/public/images/
-```
-
-Folder thumbnails are saved to:
-
-```text
-src/public/thumbnail/
-```
-
-The expected image name is based on the `.pkg` filename.
-
-Example package:
-
-```text
-Alan_Wake_Remastered_CUSA24653.pkg
-```
-
-Expected package cover:
-
-```text
-src/public/images/Alan_Wake_Remastered_CUSA24653.jpg
-```
-
-Expected folder thumbnail:
-
-```text
-src/public/thumbnail/Alan_Wake_Remastered_CUSA24653.jpg
-```
-
-If a folder thumbnail is missing, the app falls back to the first package cover image for that folder.
-
-## Download missing covers
-
-Click **Download missing covers** in the web interface.
-
-The downloader only searches for missing images and missing thumbnails.
-
-On `/ps4`, the downloader scans:
-
-```text
-PS4Games only
-```
-
-On `/ps5`, the downloader scans:
-
-```text
-PS4Games + PS5Games
-```
-
-The **Live debug** toggle shows each item as it is processed.
-
-Example result:
-
-```text
-Checked 77. Downloaded 22. Skipped 0. Failed 55.
-DOWNLOADED: image - Far_Cry_5_CUSA05848.pkg (CUSA05848)
-FAILED: thumbnail - Example_PPSA12345.pkg
-```
-
-If one source is slow, times out, or fails, the app marks that item as skipped/failed and moves to the next missing image instead of stopping the whole scan.
-
-## Cover search order
-
-The **Download missing covers** button searches in this order:
-
-1. GitHub cover map
-2. PlayStation Store by title ID
-3. SerialStation by title ID
-4. ORBISPatches by CUSA
-5. Content ID lookup
-6. SerialStation title search
-7. PlayStation Store title search
-
-The search engine checks for these title ID formats:
-
-```text
-CUSAxxxxx
-PPSAxxxxx
-SLUSxxxxx
-SCUSxxxxx
-SCESxxxxx
-SLESxxxxx
-SLPSxxxxx
-SLPMxxxxx
-NPUJxxxxx
-NPUIxxxxx
-NPEFxxxxx
-NPUGxxxxx
-NPEGxxxxx
-NPUBxxxxx
-NPEBxxxxx
-NPHGxxxxx
-ULUSxxxxx
-ULESxxxxx
-UCUSxxxxx
-UCESxxxxx
-```
-
-Notes:
-
-- `CUSAxxxxx` is used for PS4 titles.
-- `PPSAxxxxx` is used for PS5 titles.
-- Older PlayStation IDs such as `SLUSxxxxx`, `SCUSxxxxx`, and `SCESxxxxx` are used for legacy/converted packages.
-- Not every package has a public cover source, so some covers may remain missing.
+---
 
 ## Environment variables
 
-| Variable | Description | Example |
-|---|---|---|
-| `PORT` | Web server port inside the container | `7777` |
-| `LOCALIP` | IP or hostname that consoles can reach to download PKGs from this server | `192.168.1.202` |
-| `PUBLIC_BASE_URL` | Public base URL used when building install URLs | `http://192.168.1.202:7777` |
-| `PS4IP` | PS4 package installer IP address | `192.168.1.109` |
-| `PS5IP` | PS5 IP address | `192.168.1.110` |
-| `PS4_PKG_DIR` | Path to PS4 package library inside the container | `/pkg_sender/PS4Games` |
-| `PS5_PKG_DIR` | Path to PS5 package library inside the container | `/pkg_sender/PS5Games` |
-| `PKG_DIR` | Legacy/default package library path; still supported | `/pkg_sender/PS4Games` |
-| `STATIC_FILES` | Legacy fallback for older configs; still supported | `/pkg_sender/PS4Games` |
-| `PS5_ELF_PORT` | PS5 ELF loader port | `9021` |
-| `PS5_DPI_PORT` | etaHEN Direct PKG Installer port | `9090` |
-| `PS5_DPI_WEB_PORT` | etaHEN WebUI port | `12800` |
-| `PS5_RELAPSE_DIR` | Local Relapse files path inside the container | `/pkg_sender/src/public/ps5-relapse` |
-| `PS5_TCP_TIMEOUT_MS` | Timeout for PS5 TCP requests | `30000` |
-| `PS5_PAYLOAD_LIMIT` | Maximum upload size for ELF/BIN payloads | `200mb` |
-| `COVER_MAP_URL` | Optional JSON cover map URL | `https://raw.githubusercontent.com/hmn/ps4-imagemap/master/games.json` |
-| `COVER_STORE_REGIONS` | PlayStation Store regions to try | `DK/da,GB/en,US/en,DE/de,SE/sv,NO/no` |
-| `COVER_SEARCH_REGIONS` | Regions used for title search | `DK/da,GB/en,US/en,DE/de,SE/sv,NO/no` |
-| `COVER_ENABLE_ORBISPATCHES` | Enable ORBISPatches as fallback for CUSA titles | `true` |
-| `COVER_FETCH_TIMEOUT_MS` | Timeout for each external cover-source request in milliseconds | `7000` |
-| `COVER_ITEM_TIMEOUT_MS` | Maximum time spent on one missing image/thumbnail before moving to the next item | `45000` |
-
-Example `.env`:
+Recommended `.env` / compose env values:
 
 ```env
-PORT=7777
+# App
 LOCALIP=192.168.1.202
 PUBLIC_BASE_URL=http://192.168.1.202:7777
 
-PS4IP=192.168.1.109
-PS5IP=192.168.1.110
-
-PS4_PKG_DIR=/pkg_sender/PS4Games
-PS5_PKG_DIR=/pkg_sender/PS5Games
+# Package roots inside container
 PKG_DIR=/pkg_sender/PS4Games
 STATIC_FILES=/pkg_sender/PS4Games
+PS4_PKG_DIR=/pkg_sender/PS4Games
+PS5_PKG_DIR=/pkg_sender/PS5Games
 
+# PS4
+PS4IP=192.168.1.111
+
+# PS5
+PS5IP=192.168.1.110
+PS5_ADDR=192.168.1.110:9113
+PS5_TCP_TIMEOUT_MS=30000
+
+# PS5 install mode
+PS5_INSTALL_MODE=ps5upload
+
+# etaHEN / ELF loader ports
 PS5_ELF_PORT=9021
 PS5_DPI_PORT=9090
 PS5_DPI_WEB_PORT=12800
-PS5_RELAPSE_DIR=/pkg_sender/src/public/ps5-relapse
-PS5_TCP_TIMEOUT_MS=30000
+
+# PS5Upload
+PS5UPLOAD_ALLOW_IP=192.168.1.0/24
+PS5UPLOAD_PKG_HOST_IP=192.168.1.202
+PS5UPLOAD_WEB_PORT=19113
+PS5UPLOAD_WEB_URL=http://192.168.1.202:19113
+PS5UPLOAD_INTERNAL_URL=http://127.0.0.1:19113
+PS5UPLOAD_RUNTIME_PORT=9113
+PS5UPLOAD_INSTALL_POLL_MS=2500
+
+# Install queue
+INSTALL_QUEUE_DELAY_MS=5000
+
+# Payload manager
+PS5_PAYLOAD_DIR=/pkg_sender/src/public/ps5-payloads
 PS5_PAYLOAD_LIMIT=200mb
+PS5_PAYLOAD_MANAGER_PORT=8084
+PS5_PAYLOAD_MANAGER_REMOTE_DIR=/data/pldmgr/payloads
+PS5_PAYLOAD_MANAGER_AUTO_SYNC=true
 
-COVER_STORE_REGIONS=DK/da,GB/en,US/en,DE/de,SE/sv,NO/no
-COVER_SEARCH_REGIONS=DK/da,GB/en,US/en,DE/de,SE/sv,NO/no
-COVER_ENABLE_ORBISPATCHES=true
-COVER_FETCH_TIMEOUT_MS=4000
-COVER_ITEM_TIMEOUT_MS=20000
+# Homebrew
+PS5_HOMEBREW_DIR=/pkg_sender/src/public/ps5-homebrew
+PS5_HOMEBREW_UPLOAD_LIMIT=2gb
+PS5_HOMEBREW_DEPLOY_METHOD=ps5upload
+PS5_HOMEBREW_REMOTE_ROOT=/data/homebrew
+
+# FTP fallback, only used if PS5_HOMEBREW_DEPLOY_METHOD=ftp
+PS5_FTP_PORT=1337
+
+# PS2 / PS5SX2
+PS2_GAME_DIR=/pkg_sender/PS2Games
+PS2_GAME_REMOTE_ROOT=/data/PCSX2/games
+PS2_GAME_EXTENSIONS=.iso,.chd,.cso,.bin,.img,.mdf,.nrg,.gz
+PCSX2_BIOS_REMOTE_DIR=/data/PCSX2/bios
+PS5SX2_UPLOAD_LIMIT=2gb
+PCSX2_BIOS_EXTENSIONS=.bin,.rom,.erom,.nvm,.mec,.zip,.txt
+
+# Nintendo Switch / ProsperoEden
+SWITCH_GAME_DIR=/pkg_sender/SwitchGames
+SWITCH_GAME_REMOTE_ROOT=/data/prosperoeden/roms
+SWITCH_GAME_EXTENSIONS=.nsp,.xci,.nsz,.xcz
+PROSPEROEDEN_ROOT=/data/prosperoeden
+PROSPEROEDEN_UPLOAD_LIMIT=8gb
+
+# Relapse host files
+PS5_RELAPSE_DIR=/pkg_sender/src/public/ps5-relapse
 ```
 
-## Docker Compose example
+---
 
-Example service:
+## Build and run
 
-```yaml
-services:
-  pkgsender:
-    build:
-      context: ./pkgsender
-      dockerfile: Dockerfile
-    image: pkgsender:latest
-    container_name: pkgsender
-    restart: unless-stopped
-    hostname: pkgsender
-    networks:
-      DockerNet:
-        ipv4_address: 192.168.1.202
-      Proxy:
-    volumes:
-      - /srv/dev-disk-by-uuid-1e475b37-0545-4435-87c9-c7b04fe4843b/Playstation/PS4/Games/:/pkg_sender/PS4Games
-      - /srv/dev-disk-by-uuid-1e475b37-0545-4435-87c9-c7b04fe4843b/Playstation/PS5/Games/:/pkg_sender/PS5Games
-      - /srv/dev-disk-by-uuid-2d63569d-15a7-41a3-8009-e9b487095e11/dockercompose/dockerfiles/pkgsender/src:/pkg_sender/src
-    ports:
-      - 7777:7777
-    environment:
-      - PORT=7777
-      - PS4_PKG_DIR=/pkg_sender/PS4Games
-      - PS5_PKG_DIR=/pkg_sender/PS5Games
-      - PKG_DIR=/pkg_sender/PS4Games
-      - STATIC_FILES=/pkg_sender/PS4Games
-      - LOCALIP=192.168.1.202
-      - PUBLIC_BASE_URL=http://192.168.1.202:7777
-      - PS4IP=192.168.1.109
-      - PS5IP=192.168.1.110
-      - PS5_ELF_PORT=9021
-      - PS5_DPI_PORT=9090
-      - PS5_DPI_WEB_PORT=12800
-      - PS5_RELAPSE_DIR=/pkg_sender/src/public/ps5-relapse
-      - PS5_TCP_TIMEOUT_MS=30000
-      - COVER_MAP_URL=https://raw.githubusercontent.com/hmn/ps4-imagemap/master/games.json
-      - COVER_STORE_REGIONS=DK/da,GB/en,US/en,DE/de,SE/sv,NO/no
-      - COVER_FETCH_TIMEOUT_MS=4000
-      - COVER_ITEM_TIMEOUT_MS=20000
-    labels:
-      traefik.enable: true
-      traefik.http.routers.pkgsender-secure.entrypoints: websecure
-      traefik.http.routers.pkgsender-secure.rule: Host(`pkgsender.kekec.dk`)
-      traefik.http.routers.pkgsender-secure.tls: true
-      traefik.http.routers.pkgsender-secure.tls.certresolver: http
-      traefik.docker.network: Proxy
-      traefik.http.services.pkgsender.loadbalancer.server.port: 7777
-      traefik.http.routers.pkgsender-secure.middlewares: auth@file
-
-networks:
-  DockerNet:
-    external: true
-  Proxy:
-    external: true
-```
-
-## Relapse files
-
-The app serves local Relapse files from:
-
-```text
-src/public/ps5-relapse/
-```
-
-Clone or update Relapse on the host:
+From the Docker compose folder:
 
 ```bash
-PKGSENDER_DIR=/srv/dev-disk-by-uuid-2d63569d-15a7-41a3-8009-e9b487095e11/dockercompose/dockerfiles/pkgsender
+COMPOSE_DIR=/srv/dev-disk-by-uuid-2d63569d-15a7-41a3-8009-e9b487095e11/dockercompose/dockerfiles
 
-cd "$PKGSENDER_DIR/src/public"
+cd "$COMPOSE_DIR"
 
-rm -rf ps5-relapse
-git clone https://github.com/ntfargo/Relapse-Exploit.git ps5-relapse
+docker-compose -f dockerfiles.yml --env-file dockerfiles.env build --no-cache pkgsender
+docker-compose -f dockerfiles.yml --env-file dockerfiles.env up -d --force-recreate pkgsender
 ```
-
-Then restart the container:
-
-```bash
-docker restart pkgsender
-```
-
-From the PS5 browser, open:
-
-```text
-http://192.168.1.202:7777/ps5/relapse/
-```
-
-or, through Traefik if your PS5 can access it:
-
-```text
-https://pkgsender.kekec.dk/ps5/relapse/
-```
-
-## Install flow
-
-### PS4 install flow
-
-1. Open `/ps4`.
-2. Confirm the PS4 IP address.
-3. Click **Install** on a package.
-4. The app sends a direct install request to the PS4 package installer.
-5. The PS4 downloads the package from this server.
-
-### PS5 install flow
-
-1. Open `/ps5/tools`.
-2. Open the Relapse host on the PS5 browser.
-3. Run Relapse / etaHEN on the PS5.
-4. Make sure etaHEN Direct PKG Installer is active.
-5. Open `/ps5`.
-6. Confirm the PS5 IP address.
-7. Click **Install** on a package.
-8. The app sends the package URL to etaHEN Direct PKG Installer.
-9. The PS5 downloads the package from this server.
-
-The PS5 must be able to reach the `PUBLIC_BASE_URL`.
-
-Example:
-
-```text
-http://192.168.1.202:7777/pkgfiles/ps5/Game.pkg
-```
-
-## Rebuild and restart
-
-Because the compose file bind-mounts `src`:
-
-```text
-/srv/.../pkgsender/src:/pkg_sender/src
-```
-
-changes to these files normally only require a restart:
-
-```text
-src/app.js
-src/views/index.html
-src/views/css/style.css
-```
-
-Restart:
-
-```bash
-docker restart pkgsender
-```
-
-A rebuild is only needed when changing:
-
-```text
-Dockerfile
-package.json
-node_modules
-```
-
-Full rebuild:
-
-```bash
-cd /srv/dev-disk-by-uuid-2d63569d-15a7-41a3-8009-e9b487095e11/dockercompose/dockerfiles
-
-docker-compose -f dockerfiles.yml --env-file dockerfiles.env up -d --build --force-recreate pkgsender
-```
-
-## Validation
 
 Check logs:
 
 ```bash
-docker logs --tail=80 pkgsender
+docker logs -f pkgsender
 ```
 
-Check app syntax:
-
-```bash
-docker exec -it pkgsender sh -lc 'node --check /pkg_sender/src/app.js'
-```
-
-Check routes:
-
-```bash
-curl -I http://192.168.1.202:7777/
-curl -I http://192.168.1.202:7777/ps4
-curl -I http://192.168.1.202:7777/ps5
-curl -I http://192.168.1.202:7777/ps5/tools
-curl -I http://192.168.1.202:7777/ps5/relapse/
-curl http://192.168.1.202:7777/api/ps5/info
-```
-
-Check missing covers for PS4:
-
-```bash
-curl "http://192.168.1.202:7777/api/covers/missing?console=ps4"
-```
-
-Check missing covers for PS5:
-
-```bash
-curl "http://192.168.1.202:7777/api/covers/missing?console=ps5"
-```
-
-Check that the split package folders are mounted:
+Validate inside the container:
 
 ```bash
 docker exec -it pkgsender sh -lc '
-echo "--- PS4Games ---"
-find /pkg_sender/PS4Games -maxdepth 2 -type f -iname "*.pkg" | head
+node --check /pkg_sender/src/app.js
 
-echo "--- PS5Games ---"
-find /pkg_sender/PS5Games -maxdepth 2 -type f -iname "*.pkg" | head
+echo
+echo "PS5Upload version:"
+curl -s http://127.0.0.1:19113/api/version
+echo
+
+echo
+echo "PS5Upload PS5 status:"
+curl -s http://127.0.0.1:19113/api/ps5/status
+echo
 '
 ```
 
-## Troubleshooting
+---
 
-### `/ps5` does not show PS5 packages
+## PS5 payload order notes
 
-Check that the PS5 volume is mounted:
+For PS5 fPKG and app launching, payload order matters.
 
-```bash
-docker exec -it pkgsender sh -lc 'ls -la /pkg_sender/PS5Games'
-```
-
-Check the environment:
-
-```bash
-docker exec -it pkgsender sh -lc 'env | grep -E "PS4_PKG_DIR|PS5_PKG_DIR|PKG_DIR|STATIC_FILES"'
-```
-
-### PS5 package image is missing
-
-First, check missing covers using the PS5 console parameter:
-
-```bash
-curl "http://192.168.1.202:7777/api/covers/missing?console=ps5"
-```
-
-Then click **Download missing covers** from the `/ps5` page.
-
-For PS5 titles, filenames should ideally include a `PPSAxxxxx` title ID when possible. Example:
+A typical 11.60 setup may require:
 
 ```text
-Astro_Bot_PPSA21497.pkg
+1. Run exploit / jailbreak
+2. Load etaHEN or required jailbreak environment
+3. Load kstuff / fpkg-enable
+4. Load ShadowMountPlus if needed
+5. Load A53/PPR payload if your firmware/setup requires it
+6. Load ps5upload
+7. Install or re-register the title
 ```
 
-### Direct PS5 PKGs show as `Root`
+The Payload / ELF page sends files to `elfldr`, so `elfldr` must already be running and listening on the configured port.
 
-Update to the version that uses the filename as the virtual folder name for direct-root packages.
+---
 
-Expected behavior:
+## Common troubleshooting
 
-```text
-/pkg_sender/PS5Games/God of war - sons of sparta.pkg
-```
+### PS5 package install opens PS5Upload instead of installing
 
-shows as:
-
-```text
-PS5 / God of war - sons of sparta
-```
-
-### PS5 install request fails
-
-Check that etaHEN Direct PKG Installer is listening:
+Make sure the newest `src/app.js` and `src/views/index.html` are copied to the host-mounted `src` folder and restart the container.
 
 ```bash
-nc -vz 192.168.1.110 9090
+docker exec -it pkgsender sh -lc '
+grep -n "ps5UploadInstall\|host_file: filepath\|PS5 install mode" /pkg_sender/src/app.js
+grep -n "window.open(data.openUrl)\|PS5Upload opened" /pkg_sender/src/views/index.html || true
+'
 ```
 
-Check that the PS5 can open the server URL:
+There should be no old `window.open(data.openUrl)` install behavior.
+
+### PS5Upload source variant error
+
+If you see:
 
 ```text
-http://192.168.1.202:7777/
+unknown variant `via`
 ```
 
-Check the PS5 info endpoint:
+the app is using an old request body. The correct source body is:
 
-```bash
-curl http://192.168.1.202:7777/api/ps5/info
+```json
+{
+  "source": {
+    "host_file": "/pkg_sender/PS5Games/Game.pkg"
+  }
+}
 ```
 
-### Relapse page is missing
+### Payload sync body too large
 
-Check the folder:
+Do not use `/api/ps5/fs/write-bytes` for large payload files. This app uses `/api/transfer/file` for larger file transfers.
 
-```bash
-docker exec -it pkgsender sh -lc 'ls -la /pkg_sender/src/public/ps5-relapse | head'
+### Homebrew unknown reconcile mode
+
+Do not use `/api/transfer/dir-reconcile` with `mode: overwrite`. This app uses `/api/transfer/dir` for Homebrew folder deploy.
+
+### PS5 title does not launch
+
+If PS5Upload reports launch errors, try:
+
+```text
+1. Reload required payloads
+2. Open PS5Upload Library
+3. Refresh / Scan
+4. Re-register the title
+5. Use patch DRM registration if needed
+6. Launch again
 ```
 
-If it is missing, clone it again:
+---
+
+## Local file locations
+
+These folders are intentionally ignored by Git:
+
+```text
+src/public/ps5-payloads
+src/public/ps5-homebrew
+src/public/ps5-relapse
+src/public/images
+src/public/thumbnail
+PS4Games
+PS5Games
+PS2Games
+SwitchGames
+```
+
+Do not commit games, BIOS files, keys, firmware, payload collections, or copyrighted files.
+
+---
+
+## GitHub release workflow
 
 ```bash
 PKGSENDER_DIR=/srv/dev-disk-by-uuid-2d63569d-15a7-41a3-8009-e9b487095e11/dockercompose/dockerfiles/pkgsender
 
-cd "$PKGSENDER_DIR/src/public"
+cd "$PKGSENDER_DIR"
 
-rm -rf ps5-relapse
-git clone https://github.com/ntfargo/Relapse-Exploit.git ps5-relapse
-
-docker restart pkgsender
+git status --short
+git add .gitignore Dockerfile docker-entrypoint.sh package.json package-lock.json README.md src
+git commit -m "Add PS5Upload, PS2, Switch and emulator managers"
+git push -u origin main
 ```
 
-### Live debug seems stuck on one item
+Create a release:
 
-A cover source can sometimes respond slowly or hang. Lower these values for faster testing:
+```bash
+TAG=v2.4.0
 
-```env
-COVER_FETCH_TIMEOUT_MS=4000
-COVER_ITEM_TIMEOUT_MS=20000
+mkdir -p dist
+
+cat > RELEASE_NOTES.md <<'EOF_NOTES'
+# PS PKG Sender v2.4.0
+
+## Added
+- Direct PS5Upload install support for PS5 packages
+- PS5Upload-based Homebrew deploy instead of FTP
+- Payload Manager 8084 integration
+- PS2 games section on PS5 page
+- Upload PS2 games to /data/PCSX2/games
+- Nintendo Switch / ProsperoEden games section
+- ProsperoEden manager page for keys, firmware, updates, and mods
+- PS5SX2 BIOS manager page
+- Upload BIOS files to /data/PCSX2/bios
+
+## Fixed
+- PS5Upload install source format now uses host_file
+- Payload sync uses transfer/file instead of fs/write-bytes
+- Homebrew deploy uses transfer/dir instead of unsupported reconcile mode
+EOF_NOTES
+
+git archive --format=zip --output "dist/ps_pkgsender-${TAG}.zip" HEAD
+
+gh release create "$TAG" \
+  "dist/ps_pkgsender-${TAG}.zip" \
+  --repo kekec777/ps_pkgsender \
+  --title "PS PKG Sender ${TAG}" \
+  --notes-file RELEASE_NOTES.md \
+  --latest
 ```
 
-`COVER_FETCH_TIMEOUT_MS` controls each external HTTP request.
+---
 
-`COVER_ITEM_TIMEOUT_MS` controls the total maximum time spent on one missing image or thumbnail before the app moves to the next item.
+## Important legal note
+
+This project does not provide games, BIOS files, firmware, encryption keys, licenses, or copyrighted files.
+
+Use this tool only with homebrew and files you legally own and are legally allowed to use.
