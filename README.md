@@ -142,11 +142,11 @@ Add the volumes you use under the `pkgsender` service.
 
 ```yaml
 volumes:
-  - /srv/dev-disk-by-uuid-1e475b37-0545-4435-87c9-c7b04fe4843b/Playstation/PS4/Games/:/pkg_sender/PS4Games
-  - /srv/dev-disk-by-uuid-1e475b37-0545-4435-87c9-c7b04fe4843b/Playstation/PS5/Games/:/pkg_sender/PS5Games
-  - /srv/dev-disk-by-uuid-1e475b37-0545-4435-87c9-c7b04fe4843b/Playstation/PS2/Games/:/pkg_sender/PS2Games
-  - /srv/dev-disk-by-uuid-d71ad254-1858-41fe-8122-e350ef379c4d/Nintendo/Switch/Games/:/pkg_sender/SwitchGames
-  - /srv/dev-disk-by-uuid-2d63569d-15a7-41a3-8009-e9b487095e11/dockercompose/dockerfiles/pkgsender/src:/pkg_sender/src
+  - /pkg_sender/PS4Games/:/pkg_sender/PS4Games
+  - /pkg_sender/PS5Games/:/pkg_sender/PS5Games
+  - /pkg_sender/PS2Games/:/pkg_sender/PS2Games
+  - /pkg_sender/SwitchGames/:/pkg_sender/SwitchGames
+  - /pkg_sender/src/:/pkg_sender/src
 ```
 
 The `src` bind mount means frontend and backend source changes are loaded from the host path.
