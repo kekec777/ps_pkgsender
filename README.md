@@ -138,15 +138,15 @@ This project does not include or provide console keys, firmware, BIOS files, ROM
 
 ## Required Docker volumes
 
-Add the volumes you use under the `pkgsender` service.
+Add the volumes you use under the `pkgsender` service. Replace the host paths with your own folders.
 
 ```yaml
 volumes:
-  - /pkg_sender/PS4Games/:/pkg_sender/PS4Games
-  - /pkg_sender/PS5Games/:/pkg_sender/PS5Games
-  - /pkg_sender/PS2Games/:/pkg_sender/PS2Games
-  - /pkg_sender/SwitchGames/:/pkg_sender/SwitchGames
-  - /pkg_sender/src/:/pkg_sender/src
+  - /path/to/Playstation/PS4/Games/:/pkg_sender/PS4Games
+  - /path/to/Playstation/PS5/Games/:/pkg_sender/PS5Games
+  - /path/to/Playstation/PS2/Games/:/pkg_sender/PS2Games
+  - /path/to/Nintendo/Switch/Games/:/pkg_sender/SwitchGames
+  - /path/to/pkgsender/src:/pkg_sender/src
 ```
 
 The `src` bind mount means frontend and backend source changes are loaded from the host path.
@@ -155,12 +155,12 @@ The `src` bind mount means frontend and backend source changes are loaded from t
 
 ## Environment variables
 
-Recommended `.env` / compose env values:
+Recommended `.env` / compose env values. Replace placeholders like `<PKGSENDER_HOST_IP>`, `<PS5_IP>`, and `<LAN_CIDR>` with values for your own network:
 
 ```env
 # App
-LOCALIP=192.168.1.202
-PUBLIC_BASE_URL=http://192.168.1.202:7777
+LOCALIP=<PKGSENDER_HOST_IP>
+PUBLIC_BASE_URL=http://<PKGSENDER_HOST_IP>:7777
 
 # Package roots inside container
 PKG_DIR=/pkg_sender/PS4Games
@@ -169,11 +169,11 @@ PS4_PKG_DIR=/pkg_sender/PS4Games
 PS5_PKG_DIR=/pkg_sender/PS5Games
 
 # PS4
-PS4IP=192.168.1.111
+PS4IP=<PS4_IP>
 
 # PS5
-PS5IP=192.168.1.110
-PS5_ADDR=192.168.1.110:9113
+PS5IP=<PS5_IP>
+PS5_ADDR=<PS5_IP>:9113
 PS5_TCP_TIMEOUT_MS=30000
 
 # PS5 install mode
@@ -185,10 +185,10 @@ PS5_DPI_PORT=9090
 PS5_DPI_WEB_PORT=12800
 
 # PS5Upload
-PS5UPLOAD_ALLOW_IP=192.168.1.0/24
-PS5UPLOAD_PKG_HOST_IP=192.168.1.202
+PS5UPLOAD_ALLOW_IP=<LAN_CIDR>
+PS5UPLOAD_PKG_HOST_IP=<PKGSENDER_HOST_IP>
 PS5UPLOAD_WEB_PORT=19113
-PS5UPLOAD_WEB_URL=http://192.168.1.202:19113
+PS5UPLOAD_WEB_URL=http://<PKGSENDER_HOST_IP>:19113
 PS5UPLOAD_INTERNAL_URL=http://127.0.0.1:19113
 PS5UPLOAD_RUNTIME_PORT=9113
 PS5UPLOAD_INSTALL_POLL_MS=2500
@@ -238,7 +238,7 @@ PS5_RELAPSE_DIR=/pkg_sender/src/public/ps5-relapse
 From the Docker compose folder:
 
 ```bash
-COMPOSE_DIR=/srv/dev-disk-by-uuid-2d63569d-15a7-41a3-8009-e9b487095e11/dockercompose/dockerfiles
+COMPOSE_DIR=/path/to/docker-compose-folder
 
 cd "$COMPOSE_DIR"
 
@@ -371,7 +371,7 @@ Do not commit games, BIOS files, keys, firmware, payload collections, or copyrig
 ## GitHub release workflow
 
 ```bash
-PKGSENDER_DIR=/srv/dev-disk-by-uuid-2d63569d-15a7-41a3-8009-e9b487095e11/dockercompose/dockerfiles/pkgsender
+PKGSENDER_DIR=/path/to/pkgsender
 
 cd "$PKGSENDER_DIR"
 
@@ -412,7 +412,7 @@ git archive --format=zip --output "dist/ps_pkgsender-${TAG}.zip" HEAD
 
 gh release create "$TAG" \
   "dist/ps_pkgsender-${TAG}.zip" \
-  --repo kekec777/ps_pkgsender \
+  --repo <github-user>/ps_pkgsender \
   --title "PS PKG Sender ${TAG}" \
   --notes-file RELEASE_NOTES.md \
   --latest
