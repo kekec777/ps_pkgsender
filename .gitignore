@@ -1,24 +1,48 @@
 node_modules/
 npm-debug.log*
 .DS_Store
+
 .env
 *.env
 
 files/
 PS4Games/
 PS5Games/
+PS2Games/
+SwitchGames/
 
 src/public/ps5-relapse/
 src/public/ps5-payloads/
 src/public/ps5-homebrew/
 
-# Ignore downloaded game covers/thumbnails
 src/public/images/*
 src/public/thumbnail/*
-
-# Keep folders in git
 !src/public/images/.gitkeep
 !src/public/thumbnail/.gitkeep
+
+# Do not commit local dumps, payload collections, BIOS, keys, firmware, or game data
+keys/
+firmware/
+roms/
+updates/
+mods/
+bios/
+*.pkg
+*.iso
+*.chd
+*.cso
+*.bin
+*.img
+*.mdf
+*.nrg
+*.gz
+*.nsp
+*.xci
+*.nsz
+*.xcz
+*.keys
+prod.keys
+title.keys
 
 BACKUP/
 screenshots/

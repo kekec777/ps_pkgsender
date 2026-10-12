@@ -391,6 +391,20 @@
       background: #dcfce7;
     }
 
+    .platform-badge.ps2 {
+      background: #fef3c7;
+    }
+
+    .platform-badge.switch {
+      color: #fff;
+      background: linear-gradient(135deg, #ef4444, #2563eb);
+    }
+
+    .platform-badge.retro {
+      color: #fff;
+      background: linear-gradient(135deg, #8b5cf6, #06b6d4);
+    }
+
     .library-mode-pill {
       color: #dbeafe;
       background: rgba(59, 130, 246, .18);
@@ -743,6 +757,18 @@
           <i class="fa-solid fa-folder-tree"></i>
           Homebrew apps
         </a>
+        <a class="btn btn-outline-light btn-sm" href="{{nintendoSwitchUrl}}">
+          <i class="fa-solid fa-gamepad"></i>
+          Nintendo Switch
+        </a>
+        <a class="btn btn-outline-light btn-sm" href="{{ps5sx2Url}}">
+          <i class="fa-solid fa-compact-disc"></i>
+          PS5SX2 BIOS
+        </a>
+        <a class="btn btn-outline-light btn-sm" href="{{ps5UploadUrl}}">
+          <i class="fa-solid fa-upload"></i>
+          PS5Upload
+        </a>
         <a class="btn btn-outline-light btn-sm" href="{{ps5ToolsUrl}}">
           <i class="fa-solid fa-wrench"></i>
           PS5 tools
@@ -773,6 +799,24 @@
           <small>PS5 packages</small>
         </div>
         {{/showPs5PackageCount}}
+        {{#showPs2GameCount}}
+        <div class="package-stat-line">
+          <span>{{ps2GameCount}}</span>
+          <small>PS2 games</small>
+        </div>
+        {{/showPs2GameCount}}
+        {{#showSwitchGameCount}}
+        <div class="package-stat-line">
+          <span>{{switchGameCount}}</span>
+          <small>Switch games</small>
+        </div>
+        {{/showSwitchGameCount}}
+        {{#showRetroGameCount}}
+        <div class="package-stat-line">
+          <span>{{retroGameCount}}</span>
+          <small>Retro games</small>
+        </div>
+        {{/showRetroGameCount}}
       </div>
 
       <div class="stat-card size-stat-card">
@@ -786,6 +830,24 @@
           <span>{{ps5Size}}</span>
         </div>
         {{/showPs5Size}}
+        {{#showPs2Size}}
+        <div class="size-stat-line">
+          <small>PS2 size</small>
+          <span>{{ps2Size}}</span>
+        </div>
+        {{/showPs2Size}}
+        {{#showSwitchSize}}
+        <div class="size-stat-line">
+          <small>Switch size</small>
+          <span>{{switchSize}}</span>
+        </div>
+        {{/showSwitchSize}}
+        {{#showRetroSize}}
+        <div class="size-stat-line">
+          <small>Retro size</small>
+          <span>{{retroSize}}</span>
+        </div>
+        {{/showRetroSize}}
         <div class="size-stat-line total">
           <small>Total size</small>
           <span>{{totalSize}}</span>
@@ -878,6 +940,18 @@
               <input type="checkbox" class="platform-filter-input" value="ps5" checked>
               <span>PS5 games</span>
             </label>
+            <label class="platform-filter-toggle">
+              <input type="checkbox" class="platform-filter-input" value="ps2" checked>
+              <span>PS2 games</span>
+            </label>
+            <label class="platform-filter-toggle">
+              <input type="checkbox" class="platform-filter-input" value="switch" checked>
+              <span>Switch games</span>
+            </label>
+            <label class="platform-filter-toggle">
+              <input type="checkbox" class="platform-filter-input" value="retro" checked>
+              <span>Retro games</span>
+            </label>
           </div>
           {{/isPs5}}
         </div>
@@ -898,6 +972,22 @@
           <a class="btn btn-outline-light btn-sm" href="{{ps5HomebrewUrl}}">
             <i class="fa-solid fa-folder-tree"></i>
             Homebrew apps
+          </a>
+          <a class="btn btn-outline-light btn-sm" href="{{nintendoSwitchUrl}}">
+            <i class="fa-solid fa-gamepad"></i>
+            Nintendo Switch
+          </a>
+          <a class="btn btn-outline-light btn-sm" href="{{ps5sx2Url}}">
+            <i class="fa-solid fa-compact-disc"></i>
+            PS5SX2
+          </a>
+          <a class="btn btn-outline-light btn-sm" href="{{ps5LinksUrl}}">
+            <i class="fa-solid fa-link"></i>
+            PS5 links
+          </a>
+          <a class="btn btn-outline-light btn-sm" href="{{ps5UploadUrl}}">
+            <i class="fa-solid fa-upload"></i>
+            PS5Upload
           </a>
           {{/isPs5}}
           <button class="btn btn-outline-light btn-sm" id="expandAll" type="button">Expand all</button>
@@ -922,14 +1012,14 @@
                 >
                 <span>{{root}}</span>
               </span>
-              <span class="folder-count"><span class="platform-badge {{platform}}">{{platformLabel}}</span> {{count}} pkg</span>
+              <span class="folder-count"><span class="platform-badge {{platform}}">{{platformLabel}}</span> {{count}} {{unitLabel}}</span>
             </button>
           </h2>
 
           <div id="collapse_{{id}}" class="accordion-collapse collapse" aria-labelledby="heading_{{id}}" data-bs-parent="#accordion_pkgs">
             <div class="pkg-list">
               {{#pkgs}}
-              <article class="pkg-row" data-search="{{searchText}}" data-platform="{{platform}}">
+              <article class="pkg-row" data-search="{{searchText}}" data-platform="{{platform}}" data-action-type="{{actionType}}">
                 <button class="cover-button js-preview-image" type="button" data-image="{{imgUrl}}" data-title="{{displayName}}">
                   <img src="{{imgUrl}}" alt="{{displayName}} cover" loading="lazy" onerror="this.closest('.cover-button').classList.add('no-cover'); this.remove();">
                   <span class="cover-fallback"><i class="fa-solid fa-image"></i></span>
@@ -947,8 +1037,8 @@
                 <form class="install-form" action="{{installAction}}" method="post">
                   <input type="hidden" name="filepath" value="{{filepath}}">
                   <button type="submit" class="btn btn-success install-btn">
-                    <i class="fa-solid fa-cloud-arrow-down"></i>
-                    Install
+                    <i class="fa-solid {{actionIcon}}"></i>
+                    {{actionLabel}}
                   </button>
                 </form>
               </article>
@@ -1741,33 +1831,37 @@
             var titleEl = row ? row.querySelector('.pkg-title') : null;
             var filepathInput = form.querySelector('input[name="filepath"]');
             var title = cleanText((titleEl ? titleEl.textContent : '') || (filepathInput ? filepathInput.value : '') || 'PKG');
+            var isPs2Upload = row && row.dataset && row.dataset.actionType === 'ps2-upload';
+            var isSwitchUpload = row && row.dataset && row.dataset.actionType === 'switch-upload';
+            var isUploadOnly = isPs2Upload || isSwitchUpload;
+            var uploadLabel = isSwitchUpload ? 'Nintendo Switch' : 'PS2';
 
-            resetActionResultBox('Install result', 'working');
-            setActionSummary('Adding to install queue: ' + title);
-            setActionStatus('Queueing for ' + consoleLabel + '...');
+            resetActionResultBox(isUploadOnly ? 'Upload result' : 'Install result', 'working');
+            setActionSummary((isUploadOnly ? ('Adding to ' + uploadLabel + ' upload queue: ') : 'Adding to install queue: ') + title);
+            setActionStatus(isSwitchUpload ? 'Queueing Nintendo Switch upload to /data/prosperoeden/roms...' : (isPs2Upload ? 'Queueing PS2 upload to /data/PCSX2/games...' : 'Queueing for ' + consoleLabel + '...'));
             appendActionItem(title, 'info');
 
             if (button) {
               button.disabled = true;
-              button.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Sending';
+              button.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> ' + (isUploadOnly ? 'Queueing' : 'Sending');
             }
 
             requestJson((consoleConfig.installApi || form.getAttribute('action') || '/install'), {
               method: 'POST',
               body: new URLSearchParams(new FormData(form))
             }).then(function (data) {
-              var message = data.message || data.status || ('Queued for ' + consoleLabel);
+              var message = data.message || data.status || (isSwitchUpload ? 'Queued for Nintendo Switch upload' : (isPs2Upload ? 'Queued for PS2 upload' : ('Queued for ' + consoleLabel)));
               setActionResultType('success');
               setActionSummary(message);
-              setActionStatus('Package: ' + title);
-              appendActionItem('Package was added to the install queue.', 'success');
+              setActionStatus((isUploadOnly ? 'Game: ' : 'Package: ') + title);
+              appendActionItem(isSwitchUpload ? 'Game was added to the Nintendo Switch upload queue.' : (isPs2Upload ? 'Game was added to the PS2 upload queue.' : 'Package was added to the install queue.'), 'success');
               showToast(message, 'success');
               hideActionResultBoxAfterDelay(20000);
             }).catch(function (error) {
               setActionResultType('error');
               setActionSummary(error.message || 'Install request failed');
-              setActionStatus('Package: ' + title);
-              appendActionItem('Install request failed.', 'error');
+              setActionStatus((isUploadOnly ? 'Game: ' : 'Package: ') + title);
+              appendActionItem(isSwitchUpload ? 'Nintendo Switch upload request failed.' : (isPs2Upload ? 'PS2 upload request failed.' : 'Install request failed.'), 'error');
               showToast(error.message, 'error');
               hideActionResultBoxAfterDelay(20000);
             }).finally(function () {
@@ -2466,6 +2560,7 @@
           var originalHtml = button ? button.innerHTML : '';
           var row = form.closest('.pkg-row');
           var title = row && row.querySelector('.pkg-title') ? row.querySelector('.pkg-title').textContent.trim() : 'PKG';
+          var isPs2Upload = row && row.dataset && row.dataset.actionType === 'ps2-upload';
 
           if (button) {
             button.disabled = true;
@@ -2476,7 +2571,8 @@
             method: 'POST',
             body: new URLSearchParams(new FormData(form))
           }).then(function (data) {
-            var message = data.message || ('Queued for ' + actionConsoleLabel);
+            var message = data.message || (isPs2Upload ? 'Queued for PS2 upload' : ('Queued for ' + actionConsoleLabel));
+
             showInstallQueueBox();
 
             if (data.queue) {

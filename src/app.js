@@ -37,11 +37,72 @@ const ps4PkgPath = path.resolve(
 const ps5PkgPath = path.resolve(
   process.env.PS5_PKG_DIR || './PS5Games'
 );
+const ps2GamePath = path.resolve(
+  process.env.PS2_GAME_DIR || process.env.PS2_GAMES_DIR || './PS2Games'
+);
+const ps1GamePath = path.resolve(
+  process.env.PS1_GAME_DIR || process.env.PS1_GAMES_DIR || './PS1Games'
+);
+const retroGamePath = path.resolve(
+  process.env.RETRO_GAME_DIR || process.env.RETRO_GAMES_DIR || './Retro'
+);
+const retroRemoteRoot = String(process.env.RETRO_REMOTE_ROOT || '/data/homebrew/PPSA99169/es-de/ROMs').replace(/\/+$/, '') || '/data/homebrew/PPSA99169/es-de/ROMs';
+const ps2GameRemoteRoot = String(process.env.PS2_GAME_REMOTE_ROOT || '/data/PCSX2/games').replace(/\/+$/, '') || '/data/PCSX2/games';
+const pcsx2BiosRemoteDir = String(process.env.PCSX2_BIOS_REMOTE_DIR || '/data/PCSX2/bios').replace(/\/+$/, '') || '/data/PCSX2/bios';
+const ps5sx2UploadLimit = process.env.PS5SX2_UPLOAD_LIMIT || process.env.PCSX2_UPLOAD_LIMIT || '2gb';
+const ps5sx2UploadTempDir = path.resolve(
+  process.env.PS5SX2_UPLOAD_TMP || path.join(__dirname, 'public', 'ps5sx2-upload-tmp')
+);
+const pcsx2BiosExtensions = (process.env.PCSX2_BIOS_EXTENSIONS || '.bin,.rom,.erom,.nvm,.mec,.zip,.txt')
+  .split(',')
+  .map((item) => item.trim().toLowerCase())
+  .filter(Boolean);
+const ps2GameExtensions = (process.env.PS2_GAME_EXTENSIONS || '.iso,.chd,.cso,.bin,.img,.mdf,.nrg,.gz')
+  .split(',')
+  .map((item) => item.trim().toLowerCase())
+  .filter(Boolean);
+const ps1GameExtensions = (process.env.PS1_GAME_EXTENSIONS || '.cue,.chd,.pbp,.iso,.bin,.img,.mdf,.ccd,.m3u,.toc,.ecm')
+  .split(',')
+  .map((item) => item.trim().toLowerCase())
+  .filter(Boolean);
+const retroGameExtensions = (process.env.RETRO_GAME_EXTENSIONS || '.zip,.7z,.nes,.fds,.sfc,.smc,.fig,.gb,.gbc,.gba,.n64,.z64,.v64,.md,.smd,.gen,.sms,.gg,.32x,.pce,.sgx,.ws,.wsc,.ngp,.ngc,.a26,.a52,.a78,.lnx,.j64,.rom,.col,.int,.vec,.dsk,.tap,.tzx,.z80,.uae,.adf,.ipf,.lha,.cue,.chd,.iso,.cso,.pbp,.bin,.img,.m3u,.nds,.3ds,.cia,.dol,.gcm,.rvz,.wad,.wbfs,.cdi,.gdi,.elf,.doom,.p8,.tic')
+  .split(',')
+  .map((item) => item.trim().toLowerCase())
+  .filter(Boolean);
+const switchGamePath = path.resolve(
+  process.env.SWITCH_GAME_DIR || process.env.NINTENDO_SWITCH_GAME_DIR || './SwitchGames'
+);
+const switchGameRemoteRoot = String(process.env.SWITCH_GAME_REMOTE_ROOT || process.env.PROSPEROEDEN_ROMS_DIR || '/data/prosperoeden/roms').replace(/\/+$/, '') || '/data/prosperoeden/roms';
+const switchGameExtensions = (process.env.SWITCH_GAME_EXTENSIONS || '.nsp,.xci,.nsz,.xcz')
+  .split(',')
+  .map((item) => item.trim().toLowerCase())
+  .filter(Boolean);
+const prosperoEdenRoot = String(process.env.PROSPEROEDEN_ROOT || '/data/prosperoeden').replace(/\/+$/, '') || '/data/prosperoeden';
+const prosperoEdenUploadLimit = process.env.PROSPEROEDEN_UPLOAD_LIMIT || '8gb';
+const prosperoEdenUploadTempDir = path.resolve(
+  process.env.PROSPEROEDEN_UPLOAD_TMP || path.join(__dirname, 'public', 'prosperoeden-upload-tmp')
+);
+const prosperoEdenFolders = {
+  keys: String(process.env.PROSPEROEDEN_KEYS_DIR || `${prosperoEdenRoot}/keys`).replace(/\/+$/, ''),
+  firmware: String(process.env.PROSPEROEDEN_FIRMWARE_DIR || `${prosperoEdenRoot}/firmware`).replace(/\/+$/, ''),
+  updates: String(process.env.PROSPEROEDEN_UPDATES_DIR || `${prosperoEdenRoot}/updates`).replace(/\/+$/, ''),
+  mods: String(process.env.PROSPEROEDEN_MODS_DIR || `${prosperoEdenRoot}/mods`).replace(/\/+$/, '')
+};
 
 // Backward-compatible name used by old helper functions and logs.
 const staticFilesPath = ps4PkgPath;
 const localIp = process.env.LOCALIP || 'localhost';
 const publicBaseUrl = String(process.env.PUBLIC_BASE_URL || `http://${localIp}:${port}`).replace(/\/$/, '');
+const ps5UploadPort = Number.parseInt(process.env.PS5UPLOAD_WEB_PORT || '19113', 10);
+const ps5UploadWebUrl = String(process.env.PS5UPLOAD_WEB_URL || `http://${localIp}:${ps5UploadPort}`).replace(/\/$/, '');
+const ps5UploadInternalUrl = String(process.env.PS5UPLOAD_INTERNAL_URL || `http://127.0.0.1:${ps5UploadPort}`).replace(/\/$/, '');
+const ps5UploadPkgHostIp = process.env.PS5UPLOAD_PKG_HOST_IP || localIp;
+const ps5InstallMode = String(process.env.PS5_INSTALL_MODE || 'ps5upload').toLowerCase();
+const ps5UploadRuntimePort = Number.parseInt(process.env.PS5UPLOAD_RUNTIME_PORT || '9113', 10);
+const ps5UploadInstallPollMs = Number.parseInt(process.env.PS5UPLOAD_INSTALL_POLL_MS || '2500', 10);
+const ps5UploadInstallTimeoutMs = Number.parseInt(process.env.PS5UPLOAD_INSTALL_TIMEOUT_MS || String(12 * 60 * 60 * 1000), 10);
+
+
 let currentPS5ipadr = process.env.PS5IP || process.env.PS5_HOST || '';
 const ps5ElfPort = Number.parseInt(process.env.PS5_ELF_PORT || '9021', 10);
 const ps5DpiPort = Number.parseInt(process.env.PS5_DPI_PORT || '9090', 10);
@@ -67,6 +128,11 @@ const ps5HomebrewAppsDir = path.join(ps5HomebrewDir, 'apps');
 const ps5HomebrewTmpDir = path.join(ps5HomebrewDir, 'tmp');
 const ps5FtpPort = Number.parseInt(process.env.PS5_FTP_PORT || '1337', 10);
 const ps5HomebrewRemoteRoot = process.env.PS5_HOMEBREW_REMOTE_ROOT || '/data/homebrew';
+const ps5HomebrewDeployMethod = String(process.env.PS5_HOMEBREW_DEPLOY_METHOD || 'ps5upload').toLowerCase();
+const ps5PayloadManagerPort = Number.parseInt(process.env.PS5_PAYLOAD_MANAGER_PORT || '8084', 10);
+const ps5PayloadManagerRemoteDir = process.env.PS5_PAYLOAD_MANAGER_REMOTE_DIR || '/data/pldmgr/payloads';
+const ps5PayloadManagerAutoSync = String(process.env.PS5_PAYLOAD_MANAGER_AUTO_SYNC || 'true').toLowerCase() !== 'false';
+
 const ps5FtpTimeoutMs = Number.parseInt(process.env.PS5_FTP_TIMEOUT_MS || '120000', 10);
 const coverImagesPath = path.join(__dirname, 'public', 'images');
 const thumbnailImagesPath = path.join(__dirname, 'public', 'thumbnail');
@@ -300,6 +366,7 @@ app.use('/ps5/payload-files', express.static(ps5PayloadDir, { dotfiles: 'deny', 
 app.use('/ps5/homebrew-files', express.static(ps5HomebrewAppsDir, { dotfiles: 'deny', fallthrough: false }));
 app.use('/pkgfiles/ps4', express.static(ps4PkgPath, { dotfiles: 'deny', fallthrough: false }));
 app.use('/pkgfiles/ps5', express.static(ps5PkgPath, { dotfiles: 'deny', fallthrough: false }));
+app.use('/pkgfiles/ps2', express.static(ps2GamePath, { dotfiles: 'deny', fallthrough: false }));
 
 // Legacy PS4 URL support. Existing PS4 installs using /pkgfiles/<file>.pkg still work.
 app.use('/pkgfiles', express.static(ps4PkgPath, { dotfiles: 'deny', fallthrough: false }));
@@ -366,7 +433,7 @@ function getConsoleViewData(consoleType = 'ps4') {
     consoleBadge: `${label} PKG Sender`,
     consoleTitle: `${label} package library`,
     consoleDescription: isPs5
-      ? 'Browse PS4-compatible packages plus native PS5 packages, and send install URLs to your PS5 with etaHEN Direct PKG Installer.'
+      ? 'Browse PS4-compatible packages, native PS5 packages, PS2 games for PCSX2, Nintendo Switch games for ProsperoEden, and Retro games for RetroArch.'
       : 'Browse only PS4-compatible packages and send install requests to your PS4 without leaving the page.',
     consoleTargetLabel: 'Target console',
     consoleIpTitle: `${label} IP address`,
@@ -382,13 +449,17 @@ function getConsoleViewData(consoleType = 'ps4') {
     ps4LibraryUrl: '/ps4',
     ps5LibraryUrl: '/ps5',
     consoleToolsUrl: '/ps5/tools',
-    libraryModeLabel: isPs5 ? 'PS5 view: PS4 + PS5 packages' : 'PS4 view: PS4 packages only',
+    libraryModeLabel: isPs5 ? 'PS5 view: PS4 + PS5 packages + PS2 + Nintendo Switch + Retro games' : 'PS4 view: PS4 packages only',
     consoleConfigJson: makeSafeScriptJson(config),
     ps5Host: currentPS5ipadr,
     ps5RelapseUrl: '/ps5/relapse/',
     ps5ToolsUrl: '/ps5/tools',
     ps5PayloadsUrl: '/ps5/payloads',
-    ps5HomebrewUrl: '/ps5/homebrew'
+    ps5HomebrewUrl: '/ps5/homebrew',
+    nintendoSwitchUrl: '/ps5/nintendoswitch',
+    ps5sx2Url: '/ps5/ps5sx2',
+    ps5LinksUrl: '/ps5/links',
+    ps5UploadUrl: '/ps5upload'
   };
 }
 
@@ -405,14 +476,23 @@ function renderPackageLibrary(req, res, next, consoleType = 'ps4') {
     const dirs = flattenPkgs(getPkgsForConsole(consoleType));
     const ps4Dirs = flattenPkgs(getPkgsFromRoot(ps4PkgPath, 'PS4', false));
     const ps5Dirs = flattenPkgs(getPkgsFromRoot(ps5PkgPath, 'PS5', false));
+    const ps2Dirs = isPs5View ? flattenPkgs(getPs2GamesFromRoot(ps2GamePath, true)) : [];
+    const switchDirs = isPs5View ? flattenPkgs(getSwitchGamesFromRoot(switchGamePath, true)) : [];
+    const retroDirs = isPs5View ? flattenPkgs(getRetroGamesForLibrary(true)) : [];
 
     const totalPkgs = dirs.reduce((sum, dir) => sum + dir.count, 0);
     const ps4PackageCount = ps4Dirs.reduce((sum, dir) => sum + dir.count, 0);
     const ps5PackageCount = ps5Dirs.reduce((sum, dir) => sum + dir.count, 0);
+    const ps2GameCount = ps2Dirs.reduce((sum, dir) => sum + dir.count, 0);
+    const switchGameCount = switchDirs.reduce((sum, dir) => sum + dir.count, 0);
+    const retroGameCount = retroDirs.reduce((sum, dir) => sum + dir.count, 0);
 
     const totalBytes = dirs.reduce((sum, dir) => sum + dir.bytes, 0);
     const ps4Bytes = ps4Dirs.reduce((sum, dir) => sum + dir.bytes, 0);
     const ps5Bytes = ps5Dirs.reduce((sum, dir) => sum + dir.bytes, 0);
+    const ps2Bytes = ps2Dirs.reduce((sum, dir) => sum + dir.bytes, 0);
+    const switchBytes = switchDirs.reduce((sum, dir) => sum + dir.bytes, 0);
+    const retroBytes = retroDirs.reduce((sum, dir) => sum + dir.bytes, 0);
 
     res.render('index', {
       ...getConsoleViewData(consoleType),
@@ -422,10 +502,22 @@ function renderPackageLibrary(req, res, next, consoleType = 'ps4') {
       totalPkgs,
       ps4PackageCount,
       ps5PackageCount,
+      ps2GameCount,
+      switchGameCount,
+      retroGameCount,
       showPs5PackageCount: isPs5View,
+      showPs2GameCount: isPs5View,
+      showSwitchGameCount: isPs5View,
+      showRetroGameCount: isPs5View,
       showPs5Size: isPs5View,
+      showPs2Size: isPs5View,
+      showSwitchSize: isPs5View,
+      showRetroSize: isPs5View,
       ps4Size: formatDashboardSize(ps4Bytes),
       ps5Size: formatDashboardSize(ps5Bytes),
+      ps2Size: formatDashboardSize(ps2Bytes),
+      switchSize: formatDashboardSize(switchBytes),
+      retroSize: formatDashboardSize(retroBytes),
       totalSize: formatDashboardSize(totalBytes)
     });
   } catch (error) {
@@ -515,7 +607,43 @@ function enqueueInstallJob(jobInput) {
 }
 
 async function runInstallQueueJob(job) {
+  if (job.consoleType === 'switch') {
+    const result = await ps5UploadUploadSwitchGame(job.filepath, job.host || currentPS5ipadr, (status, message) => {
+      job.message = message;
+      job.result = status;
+    });
+    job.url = result.remotePath || '';
+    return result;
+  }
+
+  if (job.consoleType === 'retro') {
+    const result = await ps5UploadUploadRetroGame(job.filepath, job.host || currentPS5ipadr, (status, message) => {
+      job.message = message;
+      job.result = status;
+    });
+    job.url = result.remotePath || '';
+    return result;
+  }
+
+  if (job.consoleType === 'ps2') {
+    const result = await ps5UploadUploadPs2Game(job.filepath, job.host || currentPS5ipadr, (status, message) => {
+      job.message = message;
+      job.result = status;
+    });
+    job.url = result.remotePath || '';
+    return result;
+  }
+
   if (job.consoleType === 'ps5') {
+    if (ps5InstallMode !== 'etahen') {
+      const result = await ps5UploadInstall(job.filepath, job.host || currentPS5ipadr, (status, message) => {
+        job.message = message;
+        job.result = status;
+      });
+      job.url = result.source || '';
+      return result;
+    }
+
     const pkgUrl = buildPublicPkgUrl(job.filepath);
     job.url = pkgUrl;
     return ps5InstallUrl(job.host || currentPS5ipadr, pkgUrl, job.port || ps5DpiPort);
@@ -538,7 +666,11 @@ async function processInstallQueue() {
 
       job.status = 'running';
       job.startedAt = new Date().toISOString();
-      job.message = `Sending ${job.title} to ${String(job.consoleType || '').toUpperCase()}`;
+      job.message = job.consoleType === 'switch'
+        ? `Uploading ${job.title} to ProsperoEden roms`
+        : (job.consoleType === 'retro'
+          ? `Uploading ${job.title} to RetroArch ROMs`
+          : (job.consoleType === 'ps2' ? `Uploading ${job.title} to PCSX2 games` : `Sending ${job.title} to ${String(job.consoleType || '').toUpperCase()}`));
 
       try {
         const result = await runInstallQueueJob(job);
@@ -639,6 +771,7 @@ app.post(
         apps: getPs5HomebrewApps()
       });
     } catch (error) {
+      console.error('[homebrew-upload] failed:', error);
       res.status(400).json({ ok: false, message: error.message });
     }
   }
@@ -671,7 +804,125 @@ app.post('/api/ps5/homebrew/apps/:folder/deploy', async (req, res) => {
       port: req.body?.port,
       remoteRoot: req.body?.remoteRoot,
       username: req.body?.username,
-      password: req.body?.password
+      password: req.body?.password,
+      method: req.body?.method
+    });
+
+    res.json(result);
+  } catch (error) {
+    res.status(400).json({ ok: false, message: error.message });
+  }
+});
+
+app.post('/api/ps5/homebrew/apps/:folder/delete-remote', async (req, res) => {
+  try {
+    const result = await deletePs5HomebrewRemote(req.params.folder, {
+      host: req.body?.host,
+      remoteRoot: req.body?.remoteRoot
+    });
+
+    res.json(result);
+  } catch (error) {
+    res.status(400).json({ ok: false, message: error.message });
+  }
+});
+
+
+app.get('/ps5/nintendoswitch', (req, res) => {
+  res.type('html').send(renderProsperoEdenPage());
+});
+
+app.get('/ps5/switch', (req, res) => {
+  res.redirect('/ps5/nintendoswitch');
+});
+
+app.get('/ps5/ps5sx2', (req, res) => {
+  res.type('html').send(renderPs5sx2Page());
+});
+
+app.get('/ps5/pcsx2', (req, res) => {
+  res.redirect('/ps5/ps5sx2');
+});
+
+app.post(
+  '/api/ps5/ps5sx2/bios/upload',
+  express.raw({ type: () => true, limit: ps5sx2UploadLimit }),
+  async (req, res) => {
+    try {
+      const result = await uploadPs5sx2BiosFile({
+        filename: decodeURIComponent(String(req.headers['x-ps5sx2-filename'] || req.query.filename || 'bios.bin')),
+        relativePath: decodeURIComponent(String(req.headers['x-ps5sx2-relative-path'] || req.query.relativePath || req.headers['x-ps5sx2-filename'] || req.query.filename || 'bios.bin')),
+        host: req.headers['x-ps5-host'] || req.query.host || req.body?.host,
+        buffer: req.body
+      });
+
+      res.json(result);
+    } catch (error) {
+      res.status(400).json({ ok: false, message: error.message });
+    }
+  }
+);
+
+app.post(
+  '/api/ps5/prosperoeden/upload',
+  express.raw({ type: () => true, limit: prosperoEdenUploadLimit }),
+  async (req, res) => {
+    try {
+      const result = await uploadProsperoEdenFile({
+        target: req.headers['x-prospero-target'] || req.query.target,
+        filename: decodeURIComponent(String(req.headers['x-prospero-filename'] || req.query.filename || 'upload.bin')),
+        relativePath: decodeURIComponent(String(req.headers['x-prospero-relative-path'] || req.query.relativePath || req.headers['x-prospero-filename'] || req.query.filename || 'upload.bin')),
+        host: req.headers['x-ps5-host'] || req.query.host || req.body?.host,
+        buffer: req.body
+      });
+
+      res.json(result);
+    } catch (error) {
+      res.status(400).json({ ok: false, message: error.message });
+    }
+  }
+);
+
+app.get('/api/ps5/prosperoeden/roms', async (req, res) => {
+  try {
+    const result = await getProsperoEdenRemoteRoms({
+      host: req.query.host || req.headers['x-ps5-host']
+    });
+
+    res.json(result);
+  } catch (error) {
+    res.status(400).json({ ok: false, message: error.message });
+  }
+});
+
+app.post('/api/ps5/prosperoeden/roms/delete', express.json(), async (req, res) => {
+  try {
+    const result = await deleteProsperoEdenRemoteRom(req.body?.path || req.body?.remotePath, {
+      host: req.body?.host || req.query.host || req.headers['x-ps5-host']
+    });
+
+    res.json(result);
+  } catch (error) {
+    res.status(400).json({ ok: false, message: error.message });
+  }
+});
+
+app.get('/api/ps5/ps5sx2/games', async (req, res) => {
+  try {
+    const result = await getPs5sx2RemoteGames({
+      host: req.query.host || req.headers['x-ps5-host']
+    });
+
+    res.json(result);
+  } catch (error) {
+    res.status(400).json({ ok: false, message: error.message });
+  }
+});
+
+app.post('/api/ps5/ps5sx2/games/delete', express.json(), async (req, res) => {
+  try {
+    const result = await deletePs5sx2RemoteGame(req.body?.path || req.body?.remotePath, {
+      host: req.body?.host || req.query.host || req.headers['x-ps5-host']
     });
 
     res.json(result);
@@ -682,6 +933,10 @@ app.post('/api/ps5/homebrew/apps/:folder/deploy', async (req, res) => {
 
 app.get('/ps5/payloads', (req, res) => {
   res.type('html').send(renderPs5PayloadPage());
+});
+
+app.get('/ps5/links', (req, res) => {
+  res.type('html').send(renderPs5LinksPage());
 });
 
 app.get('/api/ps5/payloads', (req, res) => {
@@ -757,6 +1012,35 @@ app.post('/api/ps5/payloads/:filename/send', async (req, res) => {
   }
 });
 
+app.post('/api/ps5/payloads/:filename/sync-manager', async (req, res) => {
+  try {
+    const result = await syncPs5PayloadToPayloadManager(req.params.filename, {
+      host: req.body?.host || req.query?.host,
+      ps5uploadAddr: req.body?.ps5uploadAddr || req.query?.ps5uploadAddr,
+      remoteRoot: req.body?.remoteRoot || req.query?.remoteRoot
+    });
+
+    res.json(result);
+  } catch (error) {
+    res.status(400).json({ ok: false, message: error.message });
+  }
+});
+
+app.get('/api/ps5/payload-manager/list', async (req, res) => {
+  try {
+    const host = getPs5PayloadManagerHost(req.query?.host || req.body?.host);
+    const result = await getPs5PayloadManagerList(host);
+
+    res.json({
+      ok: true,
+      managerUrl: getPs5PayloadManagerUrl(host),
+      payloads: result
+    });
+  } catch (error) {
+    res.status(400).json({ ok: false, message: error.message });
+  }
+});
+
 app.get('/api/ps5/info', (req, res) => {
   res.json({
     ok: true,
@@ -767,7 +1051,10 @@ app.get('/api/ps5/info', (req, res) => {
     publicBaseUrl,
     relapseUrl: '/ps5/relapse/',
     relapsePath: ps5RelapseDir,
-    relapseExists: fs.existsSync(ps5RelapseDir)
+    relapseExists: fs.existsSync(ps5RelapseDir),
+    payloadManagerUrl: getPs5PayloadManagerUrl(currentPS5ipadr || process.env.PS5IP || process.env.PS5_HOST || '127.0.0.1'),
+    payloadManagerRemoteDir: ps5PayloadManagerRemoteDir,
+    payloadManagerAutoSync: ps5PayloadManagerAutoSync
   });
 });
 
@@ -840,21 +1127,28 @@ app.post('/api/ps5/install-url', async (req, res) => {
 app.post('/api/ps5/install', async (req, res) => {
   try {
     const filepath = resolvePkgPathForConsole(req.body.filepath, 'ps5');
-    const host = getRequiredPs5Host(req);
+    const info = getPkgLibraryInfo(filepath);
+    const isPs2Game = info?.platform === 'ps2';
+    const isSwitchGame = info?.platform === 'switch';
+    const isRetroGame = info?.platform === 'retro';
+    const isTransferOnlyGame = isPs2Game || isSwitchGame || isRetroGame;
+    const host = ps5InstallMode === 'etahen' && !isTransferOnlyGame
+      ? getRequiredPs5Host(req)
+      : String(req.body?.host || req.body?.ps5Host || req.query.host || process.env.PS5_ADDR || currentPS5ipadr || '').trim();
+
     const portToUse = Number.parseInt(String(req.body?.port || req.query.port || ps5DpiPort), 10);
 
-    if (!Number.isInteger(portToUse) || portToUse <= 0 || portToUse > 65535) {
+    if (!isTransferOnlyGame && ps5InstallMode === 'etahen' && (!Number.isInteger(portToUse) || portToUse <= 0 || portToUse > 65535)) {
       return res.status(400).json({ ok: false, message: 'Invalid PS5 Direct PKG Installer port' });
     }
 
-    const info = getPkgLibraryInfo(filepath);
     const job = enqueueInstallJob({
-      consoleType: 'ps5',
+      consoleType: isSwitchGame ? 'switch' : (isRetroGame ? 'retro' : (isPs2Game ? 'ps2' : 'ps5')),
       filepath,
       host,
       port: portToUse,
       title: path.basename(filepath),
-      platformLabel: info?.platformLabel || 'PS5'
+      platformLabel: info?.platformLabel || (isSwitchGame ? 'Switch' : (isRetroGame ? 'Retro' : (isPs2Game ? 'PS2' : 'PS5')))
     });
 
     const position = getInstallQueuePosition(job.id);
@@ -862,14 +1156,51 @@ app.post('/api/ps5/install', async (req, res) => {
     res.status(202).json({
       ok: true,
       queued: true,
+      installMode: isSwitchGame ? 'switchupload' : (isRetroGame ? 'retroupload' : (isPs2Game ? 'ps2upload' : (ps5InstallMode === 'etahen' ? 'etahen' : 'ps5upload'))),
       job: getPublicInstallJob(job),
       queue: getInstallQueueSnapshot(),
       message: position > 1
-        ? `Queued for PS5 at position ${position}`
-        : `Queued for PS5 and starting now`
+        ? `Queued for ${isSwitchGame ? 'Nintendo Switch upload' : (isRetroGame ? 'Retro upload' : (isPs2Game ? 'PS2 upload' : 'PS5'))} at position ${position}`
+        : `Queued for ${isSwitchGame ? 'Nintendo Switch upload' : (isRetroGame ? 'Retro upload' : (isPs2Game ? 'PS2 upload' : 'PS5'))} and starting now`
     });
   } catch (error) {
     res.status(400).json({ ok: false, message: error.message });
+  }
+});
+
+
+app.get('/ps5upload', (req, res) => {
+  res.redirect(ps5UploadWebUrl);
+});
+
+app.get('/api/ps5upload/info', async (req, res) => {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 2500);
+
+  try {
+    const response = await fetch(`${ps5UploadInternalUrl}/api/jobs`, {
+      signal: controller.signal
+    });
+
+    res.json({
+      ok: response.ok,
+      webUrl: ps5UploadWebUrl,
+      internalUrl: ps5UploadInternalUrl,
+      pkgHostIp: ps5UploadPkgHostIp,
+      installMode: ps5InstallMode,
+      status: response.status
+    });
+  } catch (error) {
+    res.status(503).json({
+      ok: false,
+      webUrl: ps5UploadWebUrl,
+      internalUrl: ps5UploadInternalUrl,
+      pkgHostIp: ps5UploadPkgHostIp,
+      installMode: ps5InstallMode,
+      message: error.message
+    });
+  } finally {
+    clearTimeout(timeout);
   }
 });
 
@@ -1300,6 +1631,9 @@ app.listen(port, () => {
   console.log(`PS5 Relapse static path: ${ps5RelapseDir}`);
   console.log(`PS5 payload directory: ${ps5PayloadDir}`);
   console.log(`PS5 homebrew directory: ${ps5HomebrewDir}`);
+  console.log(`PS2 games directory: ${ps2GamePath}`);
+  console.log(`PS2 games remote root: ${ps2GameRemoteRoot}`);
+  console.log(`PCSX2 BIOS remote dir: ${pcsx2BiosRemoteDir}`);
 });
 
 function flattenPkgs(pkgs) {
@@ -1312,6 +1646,9 @@ function flattenPkgs(pkgs) {
         pkg.shortDisplayName = pkg.shortDisplayName || pkg.displayName;
         pkg.platformLabel = pkg.platformLabel || 'PS4';
         pkg.platform = String(pkg.platform || pkg.platformLabel).toLowerCase();
+        pkg.actionType = pkg.actionType || (pkg.platform === 'ps2' ? 'ps2-upload' : (pkg.platform === 'switch' ? 'switch-upload' : (pkg.platform === 'retro' ? 'retro-upload' : 'pkg-install')));
+        pkg.actionLabel = pkg.actionLabel || (pkg.platform === 'ps2' ? 'Upload to PCSX2' : (pkg.platform === 'switch' ? 'Upload to ProsperoEden' : (pkg.platform === 'retro' ? 'Upload to RetroArch' : 'Install')));
+        pkg.actionIcon = pkg.actionIcon || ((pkg.platform === 'ps2' || pkg.platform === 'switch' || pkg.platform === 'retro') ? 'fa-upload' : 'fa-cloud-arrow-down');
       });
       const bytes = rootPkgs.reduce((sum, pkg) => sum + pkg.bytes, 0);
       const firstPkg = rootPkgs[0] || { imgname: 'folder.png', platformLabel: 'PS4', root };
@@ -1322,6 +1659,7 @@ function flattenPkgs(pkgs) {
         id: crypto.randomUUID(),
         root,
         count: rootPkgs.length,
+        unitLabel: ['ps2', 'switch', 'retro'].includes(String(firstPkg.platform || firstPkg.platformLabel || '').toLowerCase()) ? 'game' : 'pkg',
         platformLabel: firstPkg.platformLabel || 'PS4',
         platform: String(firstPkg.platform || firstPkg.platformLabel || 'ps4').toLowerCase(),
         bytes,
@@ -1341,7 +1679,10 @@ function getPkgsForConsole(consoleType = 'ps4') {
   if (isPs5) {
     return mergePkgMaps(
       getPkgsFromRoot(ps4PkgPath, 'PS4', true),
-      getPkgsFromRoot(ps5PkgPath, 'PS5', true)
+      getPkgsFromRoot(ps5PkgPath, 'PS5', true),
+      getPs2GamesFromRoot(ps2GamePath, true),
+      getSwitchGamesFromRoot(switchGamePath, true),
+      getRetroGamesForLibrary(true)
     );
   }
 
@@ -1427,11 +1768,451 @@ function getPkgsFromRoot(rootPath, platform = 'PS4', prefixRoot = false) {
   return filelist;
 }
 
+function isPs2GameFile(filename) {
+  return ps2GameExtensions.includes(path.extname(String(filename || '')).toLowerCase());
+}
+
+function getPs2GamesFromRoot(rootPath, prefixRoot = false) {
+  const filelist = {};
+  const basePath = path.resolve(rootPath);
+  const platformLabel = 'PS2';
+
+  if (!fs.existsSync(basePath)) {
+    return filelist;
+  }
+
+  function walkSync(dir) {
+    const files = fs.readdirSync(dir, { withFileTypes: true });
+
+    files.forEach((file) => {
+      const filepath = path.join(dir, file.name);
+
+      if (file.isDirectory()) {
+        walkSync(filepath);
+        return;
+      }
+
+      if (!file.isFile() || !isPs2GameFile(file.name)) {
+        return;
+      }
+
+      const stat = fs.statSync(filepath);
+      const relativePath = path.relative(basePath, filepath);
+      const relativeDir = path.dirname(relativePath);
+      const name = path.basename(filepath);
+      const fileBaseName = path.parse(name).name;
+      const dirname = relativeDir === '.' ? fileBaseName : relativeDir;
+      const rawRoot = relativeDir === '.' ? fileBaseName : (dirname.split(path.sep)[0] || fileBaseName || 'PS2');
+      const root = prefixRoot ? `${platformLabel} / ${rawRoot}` : rawRoot;
+
+      if (!filelist[root]) filelist[root] = [];
+
+      filelist[root].push({
+        filepath,
+        relativePath,
+        dir: dirname,
+        root: rawRoot,
+        displayRoot: root,
+        name,
+        platform: 'ps2',
+        platformLabel,
+        libraryRoot: basePath,
+        pkgUrlPrefix: 'ps2',
+        imgname: `${path.parse(filepath).name}.jpg`,
+        imgUrl: encodePublicImageUrl('images', `${path.parse(filepath).name}.jpg`),
+        size: formatFileSize(stat.size),
+        bytes: stat.size,
+        actionType: 'ps2-upload',
+        actionLabel: 'Upload to PCSX2',
+        actionIcon: 'fa-upload',
+        searchText: `${platformLabel} ${root} ${dirname} ${name}`.toLowerCase()
+      });
+    });
+  }
+
+  walkSync(basePath);
+  return filelist;
+}
+
+function isSwitchGameFile(filename) {
+  return switchGameExtensions.includes(path.extname(String(filename || '')).toLowerCase());
+}
+
+function getSwitchGamesFromRoot(rootPath, prefixRoot = false) {
+  const filelist = {};
+  const basePath = path.resolve(rootPath);
+  const platformLabel = 'Switch';
+
+  if (!fs.existsSync(basePath)) {
+    return filelist;
+  }
+
+  function walkSync(dir) {
+    const files = fs.readdirSync(dir, { withFileTypes: true });
+
+    files.forEach((file) => {
+      const filepath = path.join(dir, file.name);
+
+      if (file.isDirectory()) {
+        walkSync(filepath);
+        return;
+      }
+
+      if (!file.isFile() || !isSwitchGameFile(file.name)) {
+        return;
+      }
+
+      const stat = fs.statSync(filepath);
+      const relativePath = path.relative(basePath, filepath);
+      const relativeDir = path.dirname(relativePath);
+      const name = path.basename(filepath);
+      const fileBaseName = path.parse(name).name;
+      const dirname = relativeDir === '.' ? fileBaseName : relativeDir;
+      const rawRoot = relativeDir === '.' ? fileBaseName : (dirname.split(path.sep)[0] || fileBaseName || 'Switch');
+      const root = prefixRoot ? `${platformLabel} / ${rawRoot}` : rawRoot;
+
+      if (!filelist[root]) filelist[root] = [];
+
+      filelist[root].push({
+        filepath,
+        relativePath,
+        dir: dirname,
+        root: rawRoot,
+        displayRoot: root,
+        name,
+        platform: 'switch',
+        platformLabel,
+        libraryRoot: basePath,
+        pkgUrlPrefix: 'switch',
+        imgname: `${path.parse(filepath).name}.jpg`,
+        imgUrl: encodePublicImageUrl('images', `${path.parse(filepath).name}.jpg`),
+        size: formatFileSize(stat.size),
+        bytes: stat.size,
+        actionType: 'switch-upload',
+        actionLabel: 'Upload to ProsperoEden',
+        actionIcon: 'fa-upload',
+        searchText: `${platformLabel} Nintendo Switch ${root} ${dirname} ${name}`.toLowerCase()
+      });
+    });
+  }
+
+  walkSync(basePath);
+  return filelist;
+}
+
+
+function isPs1GameFile(filename) {
+  return ps1GameExtensions.includes(path.extname(String(filename || '')).toLowerCase());
+}
+
+function isRetroGameFile(filename) {
+  return retroGameExtensions.includes(path.extname(String(filename || '')).toLowerCase());
+}
+
+const retroSystemFolderAliases = new Map(Object.entries({
+  '3do': '3do',
+  'the 3do company - 3do': '3do',
+  'amiga': 'amiga',
+  'commodore - amiga': 'amiga',
+  'amstrad cpc': 'amstradcpc',
+  'amstrad - cpc': 'amstradcpc',
+  'arcade': 'arcade',
+  'mame': 'mame',
+  'fbneo': 'fbneo',
+  'finalburn neo': 'fbneo',
+  'finalburnneo': 'fbneo',
+  'atomiswave': 'atomiswave',
+  'naomi': 'naomi',
+  'naomi2': 'naomi2',
+  'nes': 'nes',
+  'famicom': 'nes',
+  'nintendo - nintendo entertainment system': 'nes',
+  'snes': 'snes',
+  'super nintendo': 'snes',
+  'super nintendo entertainment system': 'snes',
+  'nintendo - super nintendo entertainment system': 'snes',
+  'n64': 'n64',
+  'nintendo 64': 'n64',
+  'nintendo - nintendo 64': 'n64',
+  'gb': 'gb',
+  'game boy': 'gb',
+  'gameboy': 'gb',
+  'nintendo - game boy': 'gb',
+  'gbc': 'gbc',
+  'game boy color': 'gbc',
+  'gameboy color': 'gbc',
+  'nintendo - game boy color': 'gbc',
+  'gba': 'gba',
+  'game boy advance': 'gba',
+  'gameboy advance': 'gba',
+  'nintendo - game boy advance': 'gba',
+  'nds': 'nds',
+  'ds': 'nds',
+  'nintendo ds': 'nds',
+  'nintendo - nintendo ds': 'nds',
+  '3ds': 'n3ds',
+  'nintendo 3ds': 'n3ds',
+  'nintendo - nintendo 3ds': 'n3ds',
+  'gc': 'gc',
+  'gamecube': 'gc',
+  'nintendo gamecube': 'gc',
+  'wii': 'wii',
+  'wiiu': 'wiiu',
+  'wii u': 'wiiu',
+  'virtualboy': 'virtualboy',
+  'virtual boy': 'virtualboy',
+  'megadrive': 'megadrive',
+  'mega drive': 'megadrive',
+  'genesis': 'megadrive',
+  'sega genesis': 'megadrive',
+  'sega - mega drive - genesis': 'megadrive',
+  'mastersystem': 'mastersystem',
+  'master system': 'mastersystem',
+  'sega master system': 'mastersystem',
+  'gamegear': 'gamegear',
+  'game gear': 'gamegear',
+  'sega game gear': 'gamegear',
+  '32x': 'sega32x',
+  'sega 32x': 'sega32x',
+  'segacd': 'segacd',
+  'sega cd': 'segacd',
+  'mega cd': 'segacd',
+  'saturn': 'saturn',
+  'sega saturn': 'saturn',
+  'sega - saturn': 'saturn',
+  'dreamcast': 'dreamcast',
+  'sega dreamcast': 'dreamcast',
+  'sega - dreamcast': 'dreamcast',
+  'sg1000': 'sg1000',
+  'sg-1000': 'sg1000',
+  'psx': 'psx',
+  'ps1': 'psx',
+  'playstation': 'psx',
+  'playstation 1': 'psx',
+  'sony playstation': 'psx',
+  'sony - playstation': 'psx',
+  'psp': 'psp',
+  'playstation portable': 'psp',
+  'sony - playstation portable': 'psp',
+  'pcengine': 'pcengine',
+  'pc engine': 'pcengine',
+  'turbografx': 'pcengine',
+  'turbografx 16': 'pcengine',
+  'nec - pc engine - turbografx 16': 'pcengine',
+  'pcenginecd': 'pcenginecd',
+  'pc engine cd': 'pcenginecd',
+  'turbografx cd': 'pcenginecd',
+  'neogeo': 'neogeo',
+  'neo geo': 'neogeo',
+  'neogeocd': 'neogeocd',
+  'neo geo cd': 'neogeocd',
+  'ngp': 'ngp',
+  'neo geo pocket': 'ngp',
+  'ngpc': 'ngpc',
+  'neo geo pocket color': 'ngpc',
+  'wonderswan': 'wonderswan',
+  'wonderswancolor': 'wonderswancolor',
+  'wonderswan color': 'wonderswancolor',
+  'atari2600': 'atari2600',
+  'atari 2600': 'atari2600',
+  'atari - 2600': 'atari2600',
+  'atari5200': 'atari5200',
+  'atari 5200': 'atari5200',
+  'atari7800': 'atari7800',
+  'atari 7800': 'atari7800',
+  'atarilynx': 'atarilynx',
+  'atari lynx': 'atarilynx',
+  'atarijaguar': 'atarijaguar',
+  'atari jaguar': 'atarijaguar',
+  'atarist': 'atarist',
+  'atari st': 'atarist',
+  'colecovision': 'colecovision',
+  'coleco colecovision': 'colecovision',
+  'coleco - colecovision': 'colecovision',
+  'intellivision': 'intellivision',
+  'vectrex': 'vectrex',
+  'c64': 'c64',
+  'commodore 64': 'c64',
+  'commodore - 64': 'c64',
+  'dos': 'dos',
+  'msdos': 'dos',
+  'ms-dos': 'dos',
+  'doom': 'doom',
+  'quake': 'quake',
+  'scummvm': 'scummvm',
+  'zxspectrum': 'zxspectrum',
+  'zx spectrum': 'zxspectrum',
+  'sinclair - zx spectrum': 'zxspectrum',
+  'tic80': 'tic80',
+  'tic-80': 'tic80',
+  'pico8': 'pico8',
+  'pico-8': 'pico8'
+}));
+
+function normalizeRetroSystemKey(value) {
+  return String(value || '')
+    .toLowerCase()
+    .replace(/[_\-]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function getRetroSystemRemoteFolder(systemFolder) {
+  const key = normalizeRetroSystemKey(systemFolder);
+  const alias = retroSystemFolderAliases.get(key);
+
+  if (alias) {
+    return alias;
+  }
+
+  return key.replace(/[^a-z0-9]+/g, '') || 'roms';
+}
+
+function getPs1GamesFromRoot(rootPath, prefixRoot = false) {
+  const filelist = {};
+  const basePath = path.resolve(rootPath);
+  const platformLabel = 'PS1 Retro';
+
+  if (!fs.existsSync(basePath)) {
+    return filelist;
+  }
+
+  function walkSync(dir) {
+    const files = fs.readdirSync(dir, { withFileTypes: true });
+
+    files.forEach((file) => {
+      const filepath = path.join(dir, file.name);
+
+      if (file.isDirectory()) {
+        walkSync(filepath);
+        return;
+      }
+
+      if (!file.isFile() || !isPs1GameFile(file.name)) {
+        return;
+      }
+
+      const stat = fs.statSync(filepath);
+      const relativePath = path.relative(basePath, filepath);
+      const relativeDir = path.dirname(relativePath);
+      const name = path.basename(filepath);
+      const fileBaseName = path.parse(name).name;
+      const dirname = relativeDir === '.' ? fileBaseName : relativeDir;
+      const rawRoot = relativeDir === '.' ? fileBaseName : (dirname.split(path.sep)[0] || fileBaseName || 'PS1');
+      const root = prefixRoot ? `Retro / PS1 / ${rawRoot}` : rawRoot;
+
+      if (!filelist[root]) filelist[root] = [];
+
+      filelist[root].push({
+        filepath,
+        relativePath,
+        dir: dirname,
+        root: rawRoot,
+        displayRoot: root,
+        name,
+        platform: 'retro',
+        platformLabel,
+        libraryRoot: basePath,
+        pkgUrlPrefix: 'ps1',
+        imgname: `${path.parse(filepath).name}.jpg`,
+        imgUrl: encodePublicImageUrl('images', `${path.parse(filepath).name}.jpg`),
+        size: formatFileSize(stat.size),
+        bytes: stat.size,
+        actionType: 'retro-upload',
+        actionLabel: 'Upload to RetroArch',
+        actionIcon: 'fa-upload',
+        retroSystem: 'psx',
+        searchText: `Retro PS1 PlayStation psx ${root} ${dirname} ${name}`.toLowerCase()
+      });
+    });
+  }
+
+  walkSync(basePath);
+  return filelist;
+}
+
+function getRetroGamesFromRoot(rootPath, prefixRoot = false) {
+  const filelist = {};
+  const basePath = path.resolve(rootPath);
+  const platformLabel = 'Retro';
+
+  if (!fs.existsSync(basePath)) {
+    return filelist;
+  }
+
+  function walkSync(dir) {
+    const files = fs.readdirSync(dir, { withFileTypes: true });
+
+    files.forEach((file) => {
+      const filepath = path.join(dir, file.name);
+
+      if (file.isDirectory()) {
+        walkSync(filepath);
+        return;
+      }
+
+      if (!file.isFile() || !isRetroGameFile(file.name)) {
+        return;
+      }
+
+      const stat = fs.statSync(filepath);
+      const relativePath = path.relative(basePath, filepath);
+      const relativeParts = relativePath.split(path.sep).filter(Boolean);
+      const sourceSystem = relativeParts.length > 1 ? relativeParts[0] : 'Retro';
+      const retroSystem = getRetroSystemRemoteFolder(sourceSystem);
+      const relativeDir = path.dirname(relativePath);
+      const name = path.basename(filepath);
+      const fileBaseName = path.parse(name).name;
+      const dirname = relativeDir === '.' ? fileBaseName : relativeDir;
+      const rawRoot = relativeDir === '.' ? fileBaseName : (dirname.split(path.sep)[0] || fileBaseName || 'Retro');
+      const root = prefixRoot ? `Retro / ${rawRoot}` : rawRoot;
+
+      if (!filelist[root]) filelist[root] = [];
+
+      filelist[root].push({
+        filepath,
+        relativePath,
+        dir: dirname,
+        root: rawRoot,
+        displayRoot: root,
+        name,
+        platform: 'retro',
+        platformLabel,
+        libraryRoot: basePath,
+        pkgUrlPrefix: 'retro',
+        imgname: `${path.parse(filepath).name}.jpg`,
+        imgUrl: encodePublicImageUrl('images', `${path.parse(filepath).name}.jpg`),
+        size: formatFileSize(stat.size),
+        bytes: stat.size,
+        actionType: 'retro-upload',
+        actionLabel: `Upload to ${retroSystem}`,
+        actionIcon: 'fa-upload',
+        retroSystem,
+        searchText: `Retro ${retroSystem} ${sourceSystem} ${root} ${dirname} ${name}`.toLowerCase()
+      });
+    });
+  }
+
+  walkSync(basePath);
+  return filelist;
+}
+
+function getRetroGamesForLibrary(prefixRoot = false) {
+  return mergePkgMaps(
+    getPs1GamesFromRoot(ps1GamePath, prefixRoot),
+    getRetroGamesFromRoot(retroGamePath, prefixRoot)
+  );
+}
+
 function getPkgLibraryInfo(filepath) {
   const requestedPath = path.resolve(String(filepath || ''));
   const candidates = [
     { root: ps4PkgPath, platform: 'ps4', platformLabel: 'PS4' },
-    { root: ps5PkgPath, platform: 'ps5', platformLabel: 'PS5' }
+    { root: ps5PkgPath, platform: 'ps5', platformLabel: 'PS5' },
+    { root: ps2GamePath, platform: 'ps2', platformLabel: 'PS2' },
+    { root: switchGamePath, platform: 'switch', platformLabel: 'Switch' },
+    { root: ps1GamePath, platform: 'retro', platformLabel: 'PS1 Retro', retroType: 'ps1' },
+    { root: retroGamePath, platform: 'retro', platformLabel: 'Retro', retroType: 'retro' }
   ];
 
   for (const candidate of candidates) {
@@ -1463,11 +2244,31 @@ function resolvePkgPathForConsole(filepath, consoleType = 'ps4') {
     throw new Error('PS4 view can only install packages from PS4Games');
   }
 
-  if (targetConsole === 'ps5' && !['ps4', 'ps5'].includes(info.platform)) {
-    throw new Error('PS5 view can only install packages from PS4Games or PS5Games');
+  if (targetConsole === 'ps5' && !['ps4', 'ps5', 'ps2', 'switch', 'retro'].includes(info.platform)) {
+    throw new Error('PS5 view can only use packages from PS4Games/PS5Games, PS2 games from PS2Games, Switch games from SwitchGames, or Retro games from PS1Games/Retro');
   }
 
-  if (path.extname(requestedPath).toLowerCase() !== '.pkg' || !fs.existsSync(requestedPath)) {
+  if (!fs.existsSync(requestedPath)) {
+    throw new Error(info.platform === 'ps2' ? 'PS2 game not found' : (info.platform === 'retro' ? 'Retro game not found' : 'Package not found'));
+  }
+
+  if (info.platform === 'ps2') {
+    if (!isPs2GameFile(requestedPath)) {
+      throw new Error(`Unsupported PS2 game file type. Allowed: ${ps2GameExtensions.join(', ')}`);
+    }
+  } else if (info.platform === 'switch') {
+    if (!isSwitchGameFile(requestedPath)) {
+      throw new Error(`Unsupported Nintendo Switch game file type. Allowed: ${switchGameExtensions.join(', ')}`);
+    }
+  } else if (info.platform === 'retro') {
+    if (info.retroType === 'ps1') {
+      if (!isPs1GameFile(requestedPath)) {
+        throw new Error(`Unsupported PS1 game file type. Allowed: ${ps1GameExtensions.join(', ')}`);
+      }
+    } else if (!isRetroGameFile(requestedPath)) {
+      throw new Error(`Unsupported Retro game file type. Allowed: ${retroGameExtensions.join(', ')}`);
+    }
+  } else if (path.extname(requestedPath).toLowerCase() !== '.pkg') {
     throw new Error('Package not found');
   }
 
@@ -1497,6 +2298,612 @@ function buildPublicPkgUrl(filepath) {
   }
 
   return `${publicBaseUrl}/pkgfiles/${info.platform}/${encodeRelativeUrlForRoot(info.root, filepath)}`;
+}
+
+function buildPs5UploadEnginePath(filepath) {
+  const info = getPkgLibraryInfo(filepath);
+
+  if (!info) {
+    throw new Error('Invalid package path');
+  }
+
+  const folder = info.platform === 'ps5' ? 'PS5' : 'PS4';
+  const relative = info.relative
+    .split(path.sep)
+    .filter(Boolean)
+    .join('/');
+
+  return `/pkgs/${folder}/${relative}`;
+}
+
+function buildPs5UploadOpenResponse(filepath) {
+  const info = getPkgLibraryInfo(filepath);
+  const packageName = path.basename(filepath);
+  const enginePath = buildPs5UploadEnginePath(filepath);
+
+  return {
+    ok: true,
+    ps5upload: true,
+    installMode: 'ps5upload',
+    message: `Open PS5Upload to install ${packageName}`,
+    package: packageName,
+    platform: info?.platformLabel || 'PS5',
+    packagePath: enginePath,
+    openUrl: ps5UploadWebUrl,
+    webUrl: ps5UploadWebUrl,
+    internalUrl: ps5UploadInternalUrl,
+    note: 'PS5Upload is used because the active PS5 payload listens on 9113/9114, not etaHEN DPI 9090.'
+  };
+}
+
+function normalizePs5UploadAddr(host) {
+  const raw = String(host || process.env.PS5_ADDR || currentPS5ipadr || '').trim();
+
+  if (!raw) {
+    throw new Error('Missing PS5 address for PS5Upload');
+  }
+
+  const clean = raw
+    .replace(/^https?:\/\//i, '')
+    .replace(/\/.*$/, '')
+    .trim();
+
+  if (!clean) {
+    throw new Error('Missing PS5 address for PS5Upload');
+  }
+
+  return clean.includes(':') ? clean : `${clean}:${ps5UploadRuntimePort}`;
+}
+
+function ps5UploadTitleIdFromContentId(contentId) {
+  const match = String(contentId || '').match(/^[A-Z]{2}\d{4}-([A-Z]{4}\d{5})_/i);
+  return match ? match[1].toUpperCase() : null;
+}
+
+async function ps5UploadFetchJson(pathname, options = {}, timeoutMs = 30000) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    const response = await fetch(`${ps5UploadInternalUrl}${pathname}`, {
+      ...options,
+      headers: {
+        Accept: 'application/json',
+        ...(options.body ? { 'Content-Type': 'application/json' } : {}),
+        ...(options.headers || {})
+      },
+      signal: options.signal || controller.signal
+    });
+
+    const text = await response.text();
+    let data = null;
+
+    try {
+      data = text ? JSON.parse(text) : null;
+    } catch (error) {
+      data = { message: text };
+    }
+
+    if (!response.ok) {
+      const message = data?.error || data?.message || text || `PS5Upload HTTP ${response.status}`;
+      throw new Error(message);
+    }
+
+    return data || {};
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+async function ps5UploadReadPackageMetadata(filepath) {
+  try {
+    return await ps5UploadFetchJson('/api/pkg/parse-split', {
+      method: 'POST',
+      body: JSON.stringify({ path: filepath })
+    }, 120000);
+  } catch (error) {
+    console.warn(`PS5Upload package metadata read failed for ${filepath}: ${error.message}`);
+    return {};
+  }
+}
+
+function getPs5UploadStatusMessage(status = {}, packageName = 'Package') {
+  if (status.note) return status.note;
+
+  const phase = String(status.phase || '').toLowerCase();
+  const metrics = status.metrics || {};
+  const total = Number(metrics.total_bytes || status.total || 0);
+  const done = Math.max(
+    Number(metrics.served_bytes || 0),
+    Number(status.installedBytes || 0),
+    Number(status.transferBytes || 0)
+  );
+
+  const pct = total > 0 ? ` ${Math.min(99, Math.floor((done / total) * 100))}%` : '';
+
+  if (phase === 'queued') return `Waiting for PS5Upload to start ${packageName}`;
+  if (phase === 'resolve') return `Preparing ${packageName}`;
+  if (phase === 'deliver' || phase === 'download') return `Streaming ${packageName} to the PS5${pct}`;
+  if (phase === 'install' || phase === 'verify') return `Installing ${packageName} on the PS5${pct}`;
+  if (phase === 'done') return `Install finished for ${packageName}`;
+  if (phase === 'failed') return `Install failed for ${packageName}`;
+
+  return `Installing ${packageName} with PS5Upload${pct}`;
+}
+
+async function ps5UploadInstall(filepath, host, onProgress = null) {
+  const packageName = path.basename(filepath);
+  const ps5Addr = normalizePs5UploadAddr(host);
+  const metadata = await ps5UploadReadPackageMetadata(filepath);
+  const head = metadata?.head || metadata?.pkg || {};
+  const contentId = String(head.content_id || head.contentId || '').trim();
+  const titleId = String(head.title_id || head.titleId || ps5UploadTitleIdFromContentId(contentId) || '').trim() || null;
+  const category = head.category || null;
+  const appVersion = head.app_ver || head.appVer || null;
+
+  const request = {
+    ps5_addr: ps5Addr,
+
+    // PS5Upload expects the source enum directly:
+    // { host_file: "/path/to/file.pkg" }, { console_path: "..." }, { remote: {...} }, or { url: "..." }.
+    // Do not send the old UI queue shape { via: "stream", source: "..." } here.
+    source: {
+      host_file: filepath
+    },
+
+    content_id: contentId,
+    title_id: titleId,
+    package_app_ver: appVersion,
+    category,
+    options: {
+      allow_destructive_reinstall: true
+    }
+  };
+
+  const started = await ps5UploadFetchJson('/api/pkg/install', {
+    method: 'POST',
+    body: JSON.stringify(request)
+  }, 30000);
+
+  if (!started.ok || !started.job) {
+    throw new Error(started.error || started.message || 'PS5Upload did not start the install job');
+  }
+
+  const startedAt = Date.now();
+
+  while (true) {
+    if (Date.now() - startedAt > ps5UploadInstallTimeoutMs) {
+      throw new Error(`PS5Upload install timed out for ${packageName}`);
+    }
+
+    const status = await ps5UploadFetchJson(`/api/pkg/install/status?job=${encodeURIComponent(started.job)}`, {}, 30000);
+    const message = getPs5UploadStatusMessage(status, packageName);
+
+    if (typeof onProgress === 'function') {
+      onProgress(status, message);
+    }
+
+    if (status.phase === 'done' || status.phase === 'failed') {
+      const verdict = status.verdict || status.result?.verdict || '';
+      const ok = status.phase === 'done' && !['failed', 'rejected'].includes(String(verdict).toLowerCase());
+
+      if (!ok) {
+        const errorMessage = status.error || status.errMessage || status.message || status.hint || `PS5Upload install failed for ${packageName}`;
+        throw new Error(errorMessage);
+      }
+
+      return {
+        ok: true,
+        installMode: 'ps5upload',
+        message: message || `PS5Upload installed ${packageName}`,
+        package: packageName,
+        ps5_addr: ps5Addr,
+        source: filepath,
+        job: started.job,
+        contentId,
+        titleId,
+        category,
+        status
+      };
+    }
+
+    await wait(ps5UploadInstallPollMs);
+  }
+}
+
+function toPosixRelativePath(value) {
+  return String(value || '')
+    .split(path.sep)
+    .filter(Boolean)
+    .join('/');
+}
+
+function posixDirname(value) {
+  const clean = String(value || '').replace(/\/+/g, '/');
+  const index = clean.lastIndexOf('/');
+  return index <= 0 ? '/' : clean.slice(0, index);
+}
+
+async function ps5UploadMkdirp(addr, targetPath) {
+  const clean = String(targetPath || '').replace(/\/+/g, '/').replace(/\/+$/, '');
+  if (!clean || clean === '/') return;
+
+  const parts = clean.split('/').filter(Boolean);
+  let current = clean.startsWith('/') ? '' : '';
+
+  for (const part of parts) {
+    current += `/${part}`;
+    await ps5UploadMkdir(addr, current).catch(() => {});
+  }
+}
+
+function getPs2RemotePath(filepath) {
+  const relative = toPosixRelativePath(path.relative(ps2GamePath, filepath));
+  return `${ps2GameRemoteRoot}/${relative}`.replace(/\/+/g, '/');
+}
+
+
+function getSwitchRemotePath(filepath) {
+  const relative = toPosixRelativePath(path.relative(switchGamePath, filepath));
+  return `${switchGameRemoteRoot}/${relative}`.replace(/\/+/g, '/');
+}
+
+
+function getRetroRemotePath(filepath) {
+  const info = getPkgLibraryInfo(filepath);
+
+  if (!info || info.platform !== 'retro') {
+    throw new Error('Invalid Retro game path');
+  }
+
+  if (info.retroType === 'ps1') {
+    const relative = toPosixRelativePath(path.relative(ps1GamePath, filepath));
+    return `${retroRemoteRoot}/psx/${relative}`.replace(/\/+/g, '/');
+  }
+
+  const relative = toPosixRelativePath(path.relative(retroGamePath, filepath));
+  const parts = relative.split('/').filter(Boolean);
+  const sourceSystem = parts.length > 1 ? parts.shift() : 'Retro';
+  const retroSystem = getRetroSystemRemoteFolder(sourceSystem);
+  const rest = parts.length ? parts.join('/') : path.basename(filepath);
+
+  return `${retroRemoteRoot}/${retroSystem}/${rest}`.replace(/\/+/g, '/');
+}
+
+async function ps5UploadUploadRetroGame(filepath, host, onProgress = null) {
+  const info = getPkgLibraryInfo(filepath);
+
+  if (!info || info.platform !== 'retro') {
+    throw new Error('Invalid Retro game path');
+  }
+
+  const retroName = path.basename(filepath);
+  const remotePath = getRetroRemotePath(filepath);
+  const result = await ps5UploadTransferFile(filepath, remotePath, host, (status, message) => {
+    if (typeof onProgress === 'function') {
+      onProgress(status, message || `Uploading ${retroName} to RetroArch`);
+    }
+  });
+
+  return {
+    ...result,
+    installMode: 'retroupload',
+    message: `Uploaded ${retroName} to ${result.remotePath}`,
+    game: retroName
+  };
+}
+
+
+async function ps5UploadTransferFile(localPath, remotePath, host, onProgress = null) {
+  const ps5Addr = normalizePs5UploadAddr(host);
+  const fileSize = fs.statSync(localPath).size;
+  const safeName = path.basename(localPath);
+  const remoteDir = posixDirname(remotePath);
+
+  await ps5UploadMkdirp(ps5Addr, remoteDir);
+
+  const start = await ps5UploadFetchJson('/api/transfer/file', {
+    method: 'POST',
+    body: JSON.stringify({
+      src: localPath,
+      dest: remotePath,
+      addr: ps5Addr,
+      tx_id: null
+    })
+  }, 30000);
+
+  const jobId = start.job_id || start.jobId || start.id || start.job;
+
+  if (!jobId) {
+    throw new Error(`PS5Upload did not return a transfer job id: ${JSON.stringify(start)}`);
+  }
+
+  if (typeof onProgress === 'function') {
+    onProgress(start, `Uploading ${safeName} to ${remotePath}`);
+  }
+
+  const timeoutMs = Math.max(ps5UploadInstallTimeoutMs, Math.ceil(fileSize / 1024 / 1024) * 30000);
+  const job = await ps5UploadPollJob(jobId, timeoutMs, (status) => {
+    if (typeof onProgress === 'function') {
+      onProgress(status, `Uploading ${safeName}`);
+    }
+  });
+
+  return {
+    ok: true,
+    message: `Uploaded ${safeName} to ${remotePath}`,
+    file: safeName,
+    ps5_addr: ps5Addr,
+    source: localPath,
+    remotePath,
+    bytes: fileSize,
+    sizeLabel: formatDashboardSize(fileSize),
+    jobId,
+    job
+  };
+}
+
+async function ps5UploadUploadSwitchGame(filepath, host, onProgress = null) {
+  const info = getPkgLibraryInfo(filepath);
+
+  if (!info || info.platform !== 'switch') {
+    throw new Error('Invalid Nintendo Switch game path');
+  }
+
+  const result = await ps5UploadTransferFile(filepath, getSwitchRemotePath(filepath), host, onProgress);
+
+  return {
+    ...result,
+    installMode: 'switchupload',
+    message: `Uploaded ${path.basename(filepath)} to ${result.remotePath}`,
+    game: path.basename(filepath)
+  };
+}
+
+async function ps5UploadUploadPs2Game(filepath, host, onProgress = null) {
+  const info = getPkgLibraryInfo(filepath);
+
+  if (!info || info.platform !== 'ps2') {
+    throw new Error('Invalid PS2 game path');
+  }
+
+  const ps2Name = path.basename(filepath);
+  const ps5Addr = normalizePs5UploadAddr(host);
+  const remotePath = getPs2RemotePath(filepath);
+  const remoteDir = posixDirname(remotePath);
+  const fileSize = fs.statSync(filepath).size;
+
+  await ps5UploadMkdirp(ps5Addr, remoteDir);
+
+  const start = await ps5UploadFetchJson('/api/transfer/file', {
+    method: 'POST',
+    body: JSON.stringify({
+      src: filepath,
+      dest: remotePath,
+      addr: ps5Addr,
+      tx_id: null
+    })
+  }, 30000);
+
+  const jobId = start.job_id || start.jobId || start.id || start.job;
+
+  if (!jobId) {
+    throw new Error(`PS5Upload did not return a PS2 transfer job id: ${JSON.stringify(start)}`);
+  }
+
+  if (typeof onProgress === 'function') {
+    onProgress(start, `Uploading ${ps2Name} to ${remotePath}`);
+  }
+
+  const timeoutMs = Math.max(ps5UploadInstallTimeoutMs, Math.ceil(fileSize / 1024 / 1024) * 30000);
+  const job = await ps5UploadPollJob(jobId, timeoutMs, (status) => {
+    if (typeof onProgress === 'function') {
+      onProgress(status, `Uploading ${ps2Name} to PCSX2 games`);
+    }
+  });
+
+  return {
+    ok: true,
+    installMode: 'ps2upload',
+    message: `Uploaded ${ps2Name} to ${remotePath}`,
+    game: ps2Name,
+    ps5_addr: ps5Addr,
+    source: filepath,
+    remotePath,
+    bytes: fileSize,
+    sizeLabel: formatDashboardSize(fileSize),
+    jobId,
+    job
+  };
+}
+
+
+function ensureProsperoEdenUploadTempDir() {
+  fs.mkdirSync(prosperoEdenUploadTempDir, { recursive: true });
+}
+
+function getProsperoEdenTargetConfig(target) {
+  const key = String(target || '').toLowerCase().replace(/[^a-z0-9_-]/g, '');
+  const configs = {
+    keys: {
+      label: 'Keys',
+      remoteDir: prosperoEdenFolders.keys,
+      allowed: ['.keys', '.txt']
+    },
+    firmware: {
+      label: 'Firmware',
+      remoteDir: prosperoEdenFolders.firmware,
+      allowed: ['.nca', '.cnmt', '.xml', '.tik', '.cert', '.zip']
+    },
+    updates: {
+      label: 'Updates',
+      remoteDir: prosperoEdenFolders.updates,
+      allowed: ['.nsp', '.nsz', '.nca', '.xci', '.xcz', '.zip']
+    },
+    mods: {
+      label: 'Mods',
+      remoteDir: prosperoEdenFolders.mods,
+      allowed: []
+    },
+    roms: {
+      label: 'ROMs',
+      remoteDir: switchGameRemoteRoot,
+      allowed: switchGameExtensions
+    }
+  };
+
+  if (!configs[key]) {
+    throw new Error('Invalid ProsperoEden target. Use keys, firmware, updates, mods, or roms.');
+  }
+
+  return { key, ...configs[key] };
+}
+
+function safeRemoteRelativePath(value, fallbackName) {
+  const raw = String(value || fallbackName || 'upload.bin').replace(/\\/g, '/');
+  const parts = raw
+    .split('/')
+    .map((part) => part.trim())
+    .filter(Boolean)
+    .filter((part) => part !== '.' && part !== '..')
+    .map((part) => part.replace(/[<>:"|?*\x00-\x1F]/g, '_').replace(/\s+/g, ' ').slice(0, 180));
+
+  const clean = parts.join('/');
+  return clean || safeUploadBaseName(fallbackName || 'upload.bin');
+}
+
+function safeUploadBaseName(value) {
+  return path.basename(String(value || 'upload.bin').trim() || 'upload.bin')
+    .replace(/[<>:"\\|?*\x00-\x1F]/g, '_')
+    .replace(/\s+/g, ' ')
+    .slice(0, 180) || 'upload.bin';
+}
+
+function validateProsperoEdenUploadName(config, relativePath) {
+  const baseName = path.basename(relativePath);
+  const ext = path.extname(baseName).toLowerCase();
+
+  if (config.allowed.length && !config.allowed.includes(ext)) {
+    throw new Error(`${config.label} upload must end with: ${config.allowed.join(', ')}`);
+  }
+
+  if (config.key === 'keys' && !['prod.keys', 'title.keys'].includes(baseName.toLowerCase())) {
+    throw new Error('Keys upload should be prod.keys or title.keys');
+  }
+}
+
+function resolveProsperoEdenTempFile(filename) {
+  ensureProsperoEdenUploadTempDir();
+
+  const safeName = `${Date.now()}-${crypto.randomUUID()}-${safeUploadBaseName(filename)}`;
+  const tempPath = path.resolve(prosperoEdenUploadTempDir, safeName);
+
+  if (!tempPath.startsWith(prosperoEdenUploadTempDir + path.sep)) {
+    throw new Error('Invalid temporary upload path');
+  }
+
+  return tempPath;
+}
+
+async function uploadProsperoEdenFile(options = {}) {
+  const config = getProsperoEdenTargetConfig(options.target);
+  const filename = safeUploadBaseName(options.filename || 'upload.bin');
+  const relativePath = safeRemoteRelativePath(options.relativePath || filename, filename);
+  const host = String(options.host || process.env.PS5_ADDR || currentPS5ipadr || '').trim();
+
+  if (!Buffer.isBuffer(options.buffer) || options.buffer.length === 0) {
+    throw new Error('Missing upload body');
+  }
+
+  validateProsperoEdenUploadName(config, relativePath);
+
+  const tempPath = resolveProsperoEdenTempFile(filename);
+  const remotePath = `${config.remoteDir}/${relativePath}`.replace(/\/+/g, '/');
+
+  try {
+    fs.writeFileSync(tempPath, options.buffer);
+
+    const result = await ps5UploadTransferFile(tempPath, remotePath, host, null);
+
+    return {
+      ok: true,
+      target: config.key,
+      message: `Uploaded ${relativePath} to ${remotePath}`,
+      remotePath,
+      filename,
+      relativePath,
+      bytes: options.buffer.length,
+      sizeLabel: formatDashboardSize(options.buffer.length),
+      jobId: result.jobId,
+      job: result.job
+    };
+  } finally {
+    fs.rmSync(tempPath, { force: true });
+  }
+}
+
+
+function ensurePs5sx2UploadTempDir() {
+  fs.mkdirSync(ps5sx2UploadTempDir, { recursive: true });
+}
+
+function validatePs5sx2BiosName(relativePath) {
+  const baseName = path.basename(String(relativePath || ''));
+  const ext = path.extname(baseName).toLowerCase();
+
+  // Some BIOS packs include supporting files without an extension, so only block files when an extension exists and is not allowed.
+  if (ext && pcsx2BiosExtensions.length && !pcsx2BiosExtensions.includes(ext)) {
+    throw new Error(`BIOS upload must end with: ${pcsx2BiosExtensions.join(', ')}. Extensionless support files are allowed.`);
+  }
+}
+
+function resolvePs5sx2TempFile(filename) {
+  ensurePs5sx2UploadTempDir();
+
+  const safeName = `${Date.now()}-${crypto.randomUUID()}-${safeUploadBaseName(filename || 'bios.bin')}`;
+  const tempPath = path.resolve(ps5sx2UploadTempDir, safeName);
+
+  if (!tempPath.startsWith(ps5sx2UploadTempDir + path.sep)) {
+    throw new Error('Invalid temporary PS5SX2 upload path');
+  }
+
+  return tempPath;
+}
+
+async function uploadPs5sx2BiosFile(options = {}) {
+  const filename = safeUploadBaseName(options.filename || 'bios.bin');
+  const relativePath = safeRemoteRelativePath(options.relativePath || filename, filename);
+  const host = String(options.host || process.env.PS5_ADDR || currentPS5ipadr || '').trim();
+
+  if (!Buffer.isBuffer(options.buffer) || options.buffer.length === 0) {
+    throw new Error('Missing BIOS upload body');
+  }
+
+  validatePs5sx2BiosName(relativePath);
+
+  const tempPath = resolvePs5sx2TempFile(filename);
+  const remotePath = `${pcsx2BiosRemoteDir}/${relativePath}`.replace(/\/+/g, '/');
+
+  try {
+    fs.writeFileSync(tempPath, options.buffer);
+
+    const result = await ps5UploadTransferFile(tempPath, remotePath, host, null);
+
+    return {
+      ok: true,
+      target: 'bios',
+      message: `Uploaded ${relativePath} to ${remotePath}`,
+      remotePath,
+      filename,
+      relativePath,
+      bytes: options.buffer.length,
+      sizeLabel: formatDashboardSize(options.buffer.length),
+      jobId: result.jobId,
+      job: result.job
+    };
+  } finally {
+    fs.rmSync(tempPath, { force: true });
+  }
 }
 
 function ps4Install(filepath) {
@@ -1574,6 +2981,138 @@ function getPs5Payloads() {
       };
     })
     .sort((a, b) => a.name.localeCompare(b.name));
+}
+
+
+function getPayloadManagerFolderName(filename) {
+  return path.parse(safePs5PayloadFilename(filename)).name
+    .replace(/[<>:"\\|?*\x00-\x1F]/g, '_')
+    .replace(/\s+/g, '_')
+    .slice(0, 96) || 'payload';
+}
+
+function getPs5PayloadManagerHost(input) {
+  const raw = String(input || currentPS5ipadr || process.env.PS5IP || process.env.PS5_HOST || '').trim();
+
+  if (!raw) {
+    throw new Error('Missing PS5 host/IP for Payload Manager sync');
+  }
+
+  const clean = raw
+    .replace(/^https?:\/\//i, '')
+    .replace(/\/.*$/, '')
+    .replace(/:\d+$/, '')
+    .trim();
+
+  if (!isValidHost(clean)) {
+    throw new Error('Invalid PS5 host/IP for Payload Manager sync');
+  }
+
+  return clean;
+}
+
+function getPs5PayloadManagerUrl(host) {
+  return `http://${getPs5PayloadManagerHost(host)}:${ps5PayloadManagerPort}`;
+}
+
+async function ps5PayloadManagerFetch(pathname, options = {}, timeoutMs = 5000) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    const response = await fetch(`${getPs5PayloadManagerUrl(options.host)}${pathname}`, {
+      ...options,
+      signal: options.signal || controller.signal,
+      headers: {
+        Accept: 'application/json,text/plain,*/*',
+        ...(options.headers || {})
+      }
+    });
+
+    const text = await response.text();
+
+    if (!response.ok) {
+      throw new Error(text || `Payload Manager HTTP ${response.status}`);
+    }
+
+    try {
+      return text ? JSON.parse(text) : {};
+    } catch {
+      return { text };
+    }
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+async function getPs5PayloadManagerList(host) {
+  return ps5PayloadManagerFetch('/list_payloads', { host }, 5000);
+}
+
+async function syncPs5PayloadToPayloadManager(filename, options = {}) {
+  const filepath = resolvePs5PayloadPath(filename);
+
+  if (!fs.existsSync(filepath)) {
+    throw new Error('Payload not found');
+  }
+
+  const host = getPs5PayloadManagerHost(options.host);
+  const addr = normalizePs5UploadAddr(options.ps5uploadAddr || host);
+  const managerUrl = getPs5PayloadManagerUrl(host);
+  const safeName = path.basename(filepath);
+  const folderName = getPayloadManagerFolderName(safeName);
+  const remoteRoot = String(options.remoteRoot || ps5PayloadManagerRemoteDir || '/data/pldmgr/payloads').replace(/\/+$/, '') || '/data/pldmgr/payloads';
+  const remoteFolder = `${remoteRoot}/${folderName}`;
+  const remotePath = `${remoteFolder}/${safeName}`;
+  const fileSize = fs.statSync(filepath).size;
+
+  await ps5UploadMkdir(addr, remoteRoot).catch(() => {});
+  await ps5UploadMkdir(addr, remoteFolder).catch(() => {});
+
+  // Do not use /api/ps5/fs/write-bytes for payloads. It base64-encodes the whole file
+  // and ps5upload rejects larger bodies with body_too_large. Use the streaming transfer
+  // job API instead; it reads the local host file directly from the pkgsender container.
+  const transferStart = await ps5UploadFetchJson('/api/transfer/file', {
+    method: 'POST',
+    body: JSON.stringify({
+      src: filepath,
+      dest: remotePath,
+      addr,
+      tx_id: null
+    })
+  }, 30000);
+
+  const jobId = transferStart.job_id || transferStart.jobId || transferStart.id || transferStart.job;
+
+  if (!jobId) {
+    throw new Error(`PS5Upload did not return a payload transfer job id: ${JSON.stringify(transferStart)}`);
+  }
+
+  const transferJob = await ps5UploadPollJob(jobId, Math.max(120000, Math.ceil(fileSize / 1024 / 1024) * 30000), () => {});
+
+  let managerList = null;
+
+  try {
+    managerList = await getPs5PayloadManagerList(host);
+  } catch (error) {
+    managerList = {
+      warning: `Copied, but could not refresh Payload Manager list: ${error.message}`
+    };
+  }
+
+  return {
+    ok: true,
+    message: `Synced ${safeName} to Payload Manager`,
+    payload: safeName,
+    managerUrl,
+    remotePath,
+    remoteFolder,
+    bytes: fileSize,
+    sizeLabel: formatDashboardSize(fileSize),
+    jobId,
+    transferJob,
+    managerList
+  };
 }
 
 async function sendPs5PayloadFile(filename, req) {
@@ -1916,7 +3455,423 @@ function runCurlFtpUpload({ host, portNumber, username, password, localPath, rem
   });
 }
 
-async function deployPs5HomebrewApp(folderName, options = {}) {
+
+async function ps5UploadMkdir(addr, targetPath) {
+  if (!targetPath || targetPath === '/') return;
+
+  try {
+    await ps5UploadFetchJson('/api/ps5/fs/mkdir', {
+      method: 'POST',
+      body: JSON.stringify({ addr, path: targetPath })
+    }, 30000);
+  } catch (error) {
+    const msg = String(error.message || '').toLowerCase();
+
+    // Continue if the directory already exists or if the server reports a benign mkdir failure.
+    if (!msg.includes('exist') && !msg.includes('already') && !msg.includes('eexist')) {
+      throw error;
+    }
+  }
+}
+
+async function ps5UploadPollJob(jobId, timeoutMs, onProgress = null) {
+  const startedAt = Date.now();
+
+  while (true) {
+    if (Date.now() - startedAt > timeoutMs) {
+      throw new Error(`PS5Upload transfer timed out for job ${jobId}`);
+    }
+
+    const job = await ps5UploadFetchJson(`/api/jobs/${encodeURIComponent(jobId)}`, {}, 30000);
+
+    if (typeof onProgress === 'function') {
+      onProgress(job);
+    }
+
+    if (job.status === 'done') {
+      return job;
+    }
+
+    if (job.status === 'failed') {
+      throw new Error(job.error || job.message || `PS5Upload transfer failed for job ${jobId}`);
+    }
+
+    await wait(ps5UploadInstallPollMs || 2500);
+  }
+}
+
+
+async function ps5UploadPollFsOp(addr, opId, timeoutMs = ps5FtpTimeoutMs) {
+  if (opId === undefined || opId === null || opId === '') {
+    return {};
+  }
+
+  const startedAt = Date.now();
+
+  while (true) {
+    if (Date.now() - startedAt > timeoutMs) {
+      throw new Error(`PS5Upload filesystem operation timed out for op ${opId}`);
+    }
+
+    const query = `/api/ps5/fs/op-status?op_id=${encodeURIComponent(opId)}&addr=${encodeURIComponent(addr)}`;
+    const status = await ps5UploadFetchJson(query, {}, 30000);
+    const state = String(status.status || status.state || status.phase || '').toLowerCase();
+
+    if (
+      state === 'done' ||
+      state === 'complete' ||
+      state === 'completed' ||
+      state === 'success' ||
+      status.done === true ||
+      status.ok === true
+    ) {
+      return status;
+    }
+
+    if (
+      state === 'failed' ||
+      state === 'error' ||
+      status.failed === true ||
+      status.ok === false
+    ) {
+      throw new Error(status.error || status.message || `PS5Upload filesystem operation failed for op ${opId}`);
+    }
+
+    await wait(ps5UploadInstallPollMs || 2500);
+  }
+}
+
+async function ps5UploadDeletePath(addr, targetPath, timeoutMs = ps5FtpTimeoutMs) {
+  const response = await ps5UploadFetchJson('/api/ps5/fs/delete', {
+    method: 'POST',
+    body: JSON.stringify({
+      addr,
+      path: targetPath,
+      op_id: 0
+    })
+  }, 30000);
+
+  const opId = response.op_id || response.opId || response.id || response.job_id || response.job;
+
+  if (opId !== undefined && opId !== null && opId !== '') {
+    const opStatus = await ps5UploadPollFsOp(addr, opId, timeoutMs);
+    return { response, opId, opStatus };
+  }
+
+  return { response, opId: null, opStatus: null };
+}
+
+function normalizeRemoteFsPath(value) {
+  let clean = String(value || '').replace(/\\/g, '/').replace(/\/+/g, '/').trim();
+
+  if (!clean.startsWith('/')) {
+    clean = `/${clean}`;
+  }
+
+  clean = clean.replace(/\/+$/, '');
+
+  return clean || '/';
+}
+
+function ensureRemotePathInsideRoot(rootPath, targetPath) {
+  const root = normalizeRemoteFsPath(rootPath);
+  const target = normalizeRemoteFsPath(targetPath);
+
+  if (target === root) {
+    throw new Error(`Refusing to delete root folder ${root}`);
+  }
+
+  if (!target.startsWith(`${root}/`)) {
+    throw new Error(`Refusing to access path outside ${root}`);
+  }
+
+  const parts = target.split('/').filter(Boolean);
+
+  if (parts.includes('..')) {
+    throw new Error('Invalid remote path');
+  }
+
+  return target;
+}
+
+function getEntryValue(entry, keys) {
+  for (const key of keys) {
+    if (entry && entry[key] !== undefined && entry[key] !== null) {
+      return entry[key];
+    }
+  }
+
+  return undefined;
+}
+
+function extractPs5UploadDirEntries(data) {
+  if (Array.isArray(data)) return data;
+
+  for (const key of ['entries', 'items', 'files', 'children', 'list', 'dirents', 'rows']) {
+    if (Array.isArray(data?.[key])) {
+      return data[key];
+    }
+  }
+
+  if (Array.isArray(data?.result?.entries)) return data.result.entries;
+  if (Array.isArray(data?.result?.items)) return data.result.items;
+
+  return [];
+}
+
+function normalizePs5UploadDirEntry(entry, parentPath) {
+  const rawName = String(getEntryValue(entry, ['name', 'filename', 'file_name', 'basename', 'displayName']) || '').trim();
+  const rawPath = String(getEntryValue(entry, ['path', 'fullPath', 'full_path', 'remotePath']) || '').trim();
+  const entryPath = rawPath
+    ? normalizeRemoteFsPath(rawPath)
+    : normalizeRemoteFsPath(`${normalizeRemoteFsPath(parentPath)}/${rawName}`);
+
+  const name = rawName || path.posix.basename(entryPath);
+  const kind = String(getEntryValue(entry, ['type', 'kind', 'entryType']) || '').toLowerCase();
+  const isDir = entry?.is_dir === true ||
+    entry?.isDir === true ||
+    entry?.directory === true ||
+    kind === 'dir' ||
+    kind === 'directory' ||
+    kind === 'folder';
+
+  const sizeNumber = Number(getEntryValue(entry, ['size', 'bytes', 'file_size', 'length']) || 0);
+
+  return {
+    name,
+    path: entryPath,
+    isDir,
+    type: isDir ? 'directory' : 'file',
+    size: Number.isFinite(sizeNumber) ? sizeNumber : 0,
+    sizeLabel: formatDashboardSize(Number.isFinite(sizeNumber) ? sizeNumber : 0),
+    modifiedAt: getEntryValue(entry, ['modifiedAt', 'modified_at', 'mtime', 'lastModified', 'last_modified']) || null
+  };
+}
+
+async function ps5UploadListDir(addr, remotePath, options = {}) {
+  const limit = Number.parseInt(String(options.limit || 5000), 10);
+  const query = `/api/ps5/list-dir?addr=${encodeURIComponent(addr)}&path=${encodeURIComponent(remotePath)}&limit=${encodeURIComponent(limit)}`;
+  const data = await ps5UploadFetchJson(query, {}, 30000);
+  const entries = extractPs5UploadDirEntries(data).map((entry) => normalizePs5UploadDirEntry(entry, remotePath));
+
+  return {
+    ok: true,
+    path: remotePath,
+    entries,
+    raw: data
+  };
+}
+
+async function ps5UploadListRemoteFiles(addr, remoteRoot, allowedExtensions = [], maxDepth = 4) {
+  const root = normalizeRemoteFsPath(remoteRoot);
+  const allowed = new Set((allowedExtensions || []).map((item) => String(item || '').toLowerCase()).filter(Boolean));
+  const results = [];
+  const visited = new Set();
+
+  async function visit(currentPath, depth) {
+    const cleanPath = normalizeRemoteFsPath(currentPath);
+
+    if (visited.has(cleanPath) || depth > maxDepth) {
+      return;
+    }
+
+    visited.add(cleanPath);
+
+    let listing;
+
+    try {
+      listing = await ps5UploadListDir(addr, cleanPath);
+    } catch (error) {
+      if (cleanPath === root) {
+        throw error;
+      }
+
+      return;
+    }
+
+    for (const entry of listing.entries) {
+      if (!entry.name || entry.name === '.' || entry.name === '..') {
+        continue;
+      }
+
+      if (entry.isDir) {
+        await visit(entry.path, depth + 1);
+        continue;
+      }
+
+      const ext = path.posix.extname(entry.name).toLowerCase();
+
+      if (allowed.size && !allowed.has(ext)) {
+        continue;
+      }
+
+      results.push(entry);
+    }
+  }
+
+  await visit(root, 0);
+
+  results.sort((a, b) => a.name.localeCompare(b.name));
+
+  return results;
+}
+
+function getPs5RemoteHost(options = {}) {
+  const host = String(options.host || process.env.PS5_ADDR || currentPS5ipadr || '').trim();
+
+  if (!isValidHost(host.replace(/:\d+$/, ''))) {
+    throw new Error('Missing or invalid PS5 host/IP');
+  }
+
+  return normalizePs5UploadAddr(host);
+}
+
+async function getProsperoEdenRemoteRoms(options = {}) {
+  const addr = getPs5RemoteHost(options);
+  const files = await ps5UploadListRemoteFiles(addr, switchGameRemoteRoot, switchGameExtensions, 5);
+
+  return {
+    ok: true,
+    ps5_addr: addr,
+    remoteRoot: switchGameRemoteRoot,
+    roms: files
+  };
+}
+
+async function deleteProsperoEdenRemoteRom(remotePath, options = {}) {
+  const addr = getPs5RemoteHost(options);
+  const target = ensureRemotePathInsideRoot(switchGameRemoteRoot, remotePath);
+  const result = await ps5UploadDeletePath(addr, target, ps5FtpTimeoutMs);
+
+  return {
+    ok: true,
+    message: `Deleted ${target} from ProsperoEden roms`,
+    ps5_addr: addr,
+    remotePath: target,
+    opId: result.opId,
+    opStatus: result.opStatus
+  };
+}
+
+async function getPs5sx2RemoteGames(options = {}) {
+  const addr = getPs5RemoteHost(options);
+  const files = await ps5UploadListRemoteFiles(addr, ps2GameRemoteRoot, ps2GameExtensions, 5);
+
+  return {
+    ok: true,
+    ps5_addr: addr,
+    remoteRoot: ps2GameRemoteRoot,
+    games: files
+  };
+}
+
+async function deletePs5sx2RemoteGame(remotePath, options = {}) {
+  const addr = getPs5RemoteHost(options);
+  const target = ensureRemotePathInsideRoot(ps2GameRemoteRoot, remotePath);
+  const result = await ps5UploadDeletePath(addr, target, ps5FtpTimeoutMs);
+
+  return {
+    ok: true,
+    message: `Deleted ${target} from PCSX2 games`,
+    ps5_addr: addr,
+    remotePath: target,
+    opId: result.opId,
+    opStatus: result.opStatus
+  };
+}
+
+
+async function deletePs5HomebrewRemote(folderName, options = {}) {
+  const localPath = resolvePs5HomebrewAppPath(folderName);
+  const folder = path.basename(localPath);
+  const host = String(options.host || process.env.PS5_ADDR || currentPS5ipadr || '').trim();
+
+  if (!isValidHost(host.replace(/:\d+$/, ''))) {
+    throw new Error('Missing or invalid PS5 host/IP');
+  }
+
+  const addr = normalizePs5UploadAddr(host);
+  const remoteRoot = String(options.remoteRoot || ps5HomebrewRemoteRoot || '/data/homebrew').replace(/\/+$/, '') || '/data/homebrew';
+  const remotePath = `${remoteRoot}/${folder}`;
+
+  const result = await ps5UploadDeletePath(addr, remotePath, ps5FtpTimeoutMs);
+
+  return {
+    ok: true,
+    method: 'ps5upload',
+    message: `Deleted ${remotePath} from ${addr}`,
+    folder,
+    remotePath,
+    opId: result.opId,
+    opStatus: result.opStatus
+  };
+}
+
+
+async function deployPs5HomebrewAppWithPs5Upload(folderName, options = {}) {
+  const appPath = resolvePs5HomebrewAppPath(folderName);
+
+  if (!fs.existsSync(appPath)) {
+    throw new Error('Homebrew app not found');
+  }
+
+  const host = String(options.host || process.env.PS5_ADDR || currentPS5ipadr || '').trim();
+
+  if (!isValidHost(host.replace(/:\d+$/, ''))) {
+    throw new Error('Missing or invalid PS5 host/IP');
+  }
+
+  const addr = normalizePs5UploadAddr(host);
+  const folder = path.basename(appPath);
+  const remoteRoot = String(options.remoteRoot || ps5HomebrewRemoteRoot || '/data/homebrew').replace(/\/+$/, '') || '/data/homebrew';
+  const remotePath = `${remoteRoot}/${folder}`;
+  const files = listFilesRecursive(appPath);
+
+  if (files.length === 0) {
+    throw new Error('Homebrew folder is empty');
+  }
+
+  await ps5UploadMkdir(addr, remoteRoot).catch(() => {});
+  await ps5UploadMkdir(addr, remotePath).catch(() => {});
+
+  // Plain directory transfer is used here instead of /api/transfer/dir-reconcile.
+  // The reconcile endpoint only accepts modes such as fast/resume, not overwrite.
+  // /api/transfer/dir uploads the extracted folder contents to the chosen destination.
+  const start = await ps5UploadFetchJson('/api/transfer/dir', {
+    method: 'POST',
+    body: JSON.stringify({
+      src_dir: appPath,
+      dest_root: remotePath,
+      addr,
+      tx_id: null,
+      excludes: [],
+      bandwidth_cap_mbps: null
+    })
+  }, 30000);
+
+  const jobId = start.job_id || start.jobId || start.id || start.job;
+
+  if (!jobId) {
+    throw new Error(`PS5Upload did not return a transfer job id: ${JSON.stringify(start)}`);
+  }
+
+  const job = await ps5UploadPollJob(jobId, ps5FtpTimeoutMs, () => {});
+
+  return {
+    ok: true,
+    method: 'ps5upload',
+    message: `Deployed ${folder} to ${addr}${remotePath} with PS5Upload`,
+    folder,
+    remotePath,
+    uploaded: files.length,
+    total: files.length,
+    jobId,
+    job
+  };
+}
+
+async function deployPs5HomebrewAppWithFtp(folderName, options = {}) {
+
   const appPath = resolvePs5HomebrewAppPath(folderName);
 
   if (!fs.existsSync(appPath)) {
@@ -1976,12 +3931,23 @@ async function deployPs5HomebrewApp(folderName, options = {}) {
 
   return {
     ok: true,
+    method: 'ftp',
     message: `Uploaded ${path.basename(appPath)} to ${host}:${portNumber}${remoteRoot}`,
     folder: path.basename(appPath),
     remotePath: `${remoteRoot}/${path.basename(appPath)}`,
     uploaded: uploaded.length,
     total: files.length
   };
+}
+
+async function deployPs5HomebrewApp(folderName, options = {}) {
+  const method = String(options.method || ps5HomebrewDeployMethod || 'ps5upload').toLowerCase();
+
+  if (method === 'ftp') {
+    return deployPs5HomebrewAppWithFtp(folderName, options);
+  }
+
+  return deployPs5HomebrewAppWithPs5Upload(folderName, options);
 }
 
 
@@ -2089,15 +4055,31 @@ function renderPs5NavBar(active = '') {
     ? 'Payload / ELF manager'
     : active === 'homebrew'
       ? 'Homebrew app manager'
-      : active === 'tools'
+      : active === 'switch'
+      ? 'Nintendo Switch / ProsperoEden'
+      : active === 'ps5sx2'
+      ? 'PS5SX2 / PCSX2 manager'
+      : active === 'links'
+      ? 'PS5 links'
+      : active === 'ps5upload'
+        ? 'PS5Upload web UI'
+        : active === 'tools'
         ? 'Relapse / etaHEN tools'
         : 'PS5 package library';
 
   const subtitle = active === 'payloads'
     ? 'Upload, manage and send PS5 payloads'
     : active === 'homebrew'
-      ? 'Upload ZIP apps and copy them to /data/homebrew'
-      : active === 'tools'
+      ? 'Upload ZIP apps and deploy them through PS5Upload to /data/homebrew'
+      : active === 'switch'
+        ? 'Upload keys, firmware, updates and mods to /data/prosperoeden'
+      : active === 'ps5sx2'
+        ? 'Upload BIOS files to /data/PCSX2/bios'
+      : active === 'links'
+        ? 'Open web UIs running on the PS5'
+      : active === 'ps5upload'
+        ? 'Manage installs through the integrated ps5upload engine'
+        : active === 'tools'
         ? 'Relapse host, ELF sender and etaHEN DPI'
         : 'PS5 view: PS4 + PS5 packages';
 
@@ -2122,6 +4104,10 @@ ${navButton('/ps5', 'fa-gamepad', 'PS5 library', 'ps5')}
 ${navButton('/ps4', 'fa-gamepad', 'PS4 library', 'ps4')}
 ${navButton('/ps5/payloads', 'fa-microchip', 'Payloads / ELF', 'payloads')}
 ${navButton('/ps5/homebrew', 'fa-folder-tree', 'Homebrew apps', 'homebrew')}
+${navButton('/ps5/nintendoswitch', 'fa-gamepad', 'Nintendo Switch', 'switch')}
+${navButton('/ps5/ps5sx2', 'fa-compact-disc', 'PS5SX2', 'ps5sx2')}
+${navButton('/ps5/links', 'fa-link', 'PS5 links', 'links')}
+${navButton('/ps5upload', 'fa-upload', 'PS5Upload', 'ps5upload')}
 ${navButton('/ps5/tools', 'fa-wrench', 'PS5 tools', 'tools')}
       </div>
     </section>`;
@@ -2352,13 +4338,13 @@ function renderPs5HomebrewPage() {
       <h1>Homebrew app manager</h1>
       <p class="muted">
         Upload a ZIP that contains a homebrew folder, for example <strong>PPSA99008</strong>.
-        The app extracts it locally, then can copy it to <strong>/data/homebrew/&lt;folder&gt;</strong> on your PS5 over FTP.
+        The app extracts it locally, then deploys it to <strong>/data/homebrew/&lt;folder&gt;</strong> through the integrated PS5Upload engine.
       </p>
     </section>
 
     <section class="grid">
       <article class="panel">
-        <p class="eyebrow">PS5 FTP</p>
+        <p class="eyebrow">PS5Upload</p>
         <h2>Deploy settings</h2>
 
         <div class="field">
@@ -2366,28 +4352,19 @@ function renderPs5HomebrewPage() {
           <input id="ps5Host" type="text" value="${escapeHtml(currentPS5ipadr || '')}" placeholder="192.168.1.110">
         </div>
 
-        <div class="field">
-          <label for="ps5Port">FTP port</label>
-          <input id="ps5Port" type="number" value="${ps5FtpPort}" min="1" max="65535">
-        </div>
+        <input id="ps5Port" type="hidden" value="${ps5FtpPort}">
+        <input id="ftpUser" type="hidden" value="">
+        <input id="ftpPass" type="hidden" value="">
 
         <div class="field">
           <label for="remoteRoot">Remote folder</label>
           <input id="remoteRoot" type="text" value="${escapeHtml(ps5HomebrewRemoteRoot)}" placeholder="/data/homebrew">
         </div>
 
-        <div class="field">
-          <label for="ftpUser">FTP username, optional</label>
-          <input id="ftpUser" type="text" placeholder="Leave empty for anonymous/no auth">
-        </div>
-
-        <div class="field">
-          <label for="ftpPass">FTP password, optional</label>
-          <input id="ftpPass" type="password" placeholder="Leave empty if not needed">
-        </div>
-
         <div class="help-box">
-          etaHEN FTP normally uses port <strong>1337</strong>. Make sure etaHEN is running and FTP is enabled before deploying.
+          This uses <strong>PS5Upload</strong>, not FTP. Keep the ps5upload payload running on the PS5
+          and make sure ports <strong>9113</strong>/<strong>9114</strong> are reachable.
+          The deploy target is <strong>/data/homebrew/&lt;folder&gt;</strong>, and the remote delete button removes that same folder from the PS5.
         </div>
 
         <hr style="border:0;border-top:1px solid rgba(255,255,255,.12);margin:18px 0">
@@ -2430,16 +4407,482 @@ function renderPs5HomebrewPage() {
   </main>
 
   <script>
-    const listEl = document.getElementById('homebrewList');
+    (function () {
+      'use strict';
+
+      var listEl = document.getElementById('homebrewList');
+      var statusBox = document.getElementById('statusBox');
+      var uploadBtn = document.getElementById('uploadBtn');
+      var refreshBtn = document.getElementById('refreshBtn');
+      var fileInput = document.getElementById('homebrewFile');
+      var hostInput = document.getElementById('ps5Host');
+      var portInput = document.getElementById('ps5Port');
+      var remoteRootInput = document.getElementById('remoteRoot');
+      var ftpUserInput = document.getElementById('ftpUser');
+      var ftpPassInput = document.getElementById('ftpPass');
+      var NL = String.fromCharCode(10);
+
+      function trimTrailingSlashes(value) {
+        value = String(value || '');
+        while (value.length > 1 && value.charAt(value.length - 1) === '/') {
+          value = value.slice(0, -1);
+        }
+        return value || '/';
+      }
+
+      function setStatus(message, type) {
+        if (!statusBox) return;
+        statusBox.className = 'status ' + (type || '');
+        statusBox.textContent = message || '';
+      }
+
+      function escapeText(value) {
+        return String(value || '').replace(/[&<>"']/g, function (char) {
+          return {
+            '&': '&amp;',
+            '<': '&lt;',
+            '>': '&gt;',
+            '"': '&quot;',
+            "'": '&#39;'
+          }[char];
+        });
+      }
+
+      function requestJson(url, options) {
+        options = options || {};
+        options.headers = options.headers || {};
+        options.headers.Accept = 'application/json';
+
+        return fetch(url, options).then(function (response) {
+          return response.text().then(function (text) {
+            var data = {};
+            try {
+              data = text ? JSON.parse(text) : {};
+            } catch (error) {
+              data = { message: text };
+            }
+
+            if (!response.ok) {
+              throw new Error(data.message || data.error || response.statusText);
+            }
+
+            return data;
+          });
+        });
+      }
+
+      function appActionUrl(app, action) {
+        return '/api/ps5/homebrew/apps/' + encodeURIComponent(app.name) + '/' + action;
+      }
+
+      function renderApps(apps) {
+        if (!listEl) return;
+
+        listEl.innerHTML = '';
+
+        if (!apps.length) {
+          listEl.innerHTML = '<div class="empty">No homebrew apps extracted yet.</div>';
+          return;
+        }
+
+        apps.forEach(function (app) {
+          var item = document.createElement('div');
+          item.className = 'homebrew-item';
+
+          var title = app.titleId ? app.name + ' · ' + app.titleId : app.name;
+          var meta = app.sizeLabel + ' · ' + app.fileCount + ' file(s) · Modified ' + new Date(app.modifiedAt).toLocaleString();
+
+          item.innerHTML =
+            '<div class="homebrew-name">' +
+              '<strong>' + escapeText(title) + '</strong>' +
+              '<small class="muted">' + escapeText(meta) + '</small>' +
+            '</div>' +
+            '<div class="homebrew-actions">' +
+              '<button class="btn green" type="button" data-action="deploy"><i class="fa-solid fa-cloud-arrow-up"></i> Deploy via PS5Upload</button>' +
+              '<button class="btn red" type="button" data-action="delete-remote"><i class="fa-solid fa-trash-can-arrow-up"></i> Delete from PS5</button>' +
+              '<button class="btn secondary" type="button" data-action="delete"><i class="fa-solid fa-trash"></i> Delete local</button>' +
+            '</div>';
+
+          item.querySelector('[data-action="deploy"]').addEventListener('click', function () {
+            deployApp(app);
+          });
+
+          item.querySelector('[data-action="delete-remote"]').addEventListener('click', function () {
+            deleteRemoteApp(app);
+          });
+
+          item.querySelector('[data-action="delete"]').addEventListener('click', function () {
+            deleteApp(app);
+          });
+
+          listEl.appendChild(item);
+        });
+      }
+
+      function loadApps() {
+        setStatus('Loading homebrew app list...');
+        return requestJson('/api/ps5/homebrew/apps')
+          .then(function (data) {
+            renderApps(data.apps || []);
+            setStatus('Ready.');
+          })
+          .catch(function (error) {
+            setStatus(error.message, 'error');
+          });
+      }
+
+      function uploadHomebrew() {
+        var file = fileInput && fileInput.files && fileInput.files[0];
+
+        if (!file) {
+          setStatus('Choose a .zip file first.', 'error');
+          return;
+        }
+
+        if (!String(file.name || '').toLowerCase().endsWith('.zip')) {
+          setStatus('Choose a .zip file. Selected: ' + file.name, 'error');
+          return;
+        }
+
+        uploadBtn.disabled = true;
+        setStatus('Starting upload for ' + file.name + '...');
+
+        var xhr = new XMLHttpRequest();
+
+        xhr.open('POST', '/api/ps5/homebrew/upload', true);
+        xhr.responseType = 'text';
+        xhr.setRequestHeader('Content-Type', 'application/octet-stream');
+        xhr.setRequestHeader('Accept', 'application/json');
+        xhr.setRequestHeader('x-homebrew-filename', encodeURIComponent(file.name));
+
+        xhr.upload.onprogress = function (event) {
+          if (event.lengthComputable && event.total > 0) {
+            var pct = Math.max(0, Math.min(100, Math.round((event.loaded / event.total) * 100)));
+            setStatus('Uploading ' + file.name + '... ' + pct + '%');
+          } else {
+            setStatus('Uploading ' + file.name + '...');
+          }
+        };
+
+        xhr.onerror = function () {
+          uploadBtn.disabled = false;
+          setStatus('Upload failed before the server answered. Check container logs and upload size limit.', 'error');
+        };
+
+        xhr.onload = function () {
+          uploadBtn.disabled = false;
+
+          var data = {};
+          try {
+            data = xhr.responseText ? JSON.parse(xhr.responseText) : {};
+          } catch (error) {
+            data = { message: xhr.responseText || 'Invalid JSON response from server' };
+          }
+
+          if (xhr.status < 200 || xhr.status >= 300) {
+            setStatus(data.message || data.error || ('Upload failed with HTTP ' + xhr.status), 'error');
+            return;
+          }
+
+          setStatus(data.message || 'Homebrew ZIP uploaded and extracted.', 'success');
+          if (fileInput) fileInput.value = '';
+          loadApps();
+        };
+
+        xhr.send(file);
+      }
+
+      function deployApp(app) {
+        var host = hostInput ? hostInput.value.trim() : '';
+        var port = portInput ? portInput.value.trim() : '';
+        var remoteRoot = remoteRootInput ? (remoteRootInput.value.trim() || '/data/homebrew') : '/data/homebrew';
+
+        if (!host) {
+          setStatus('Enter your PS5 IP first.', 'error');
+          return;
+        }
+
+        setStatus('Deploying ' + app.name + ' with PS5Upload to ' + trimTrailingSlashes(remoteRoot) + '/' + app.name + '...');
+
+        requestJson(appActionUrl(app, 'deploy'), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            method: 'ps5upload',
+            host: host,
+            port: port,
+            remoteRoot: remoteRoot,
+            username: ftpUserInput ? ftpUserInput.value.trim() : '',
+            password: ftpPassInput ? ftpPassInput.value : ''
+          })
+        }).then(function (data) {
+          var message = data.message || 'Deploy finished.';
+          message += NL + 'Remote path: ' + (data.remotePath || '');
+          message += NL + 'Files: ' + (data.uploaded || 0) + '/' + (data.total || 0);
+          if (data.jobId) message += NL + 'PS5Upload job: ' + data.jobId;
+          setStatus(message, 'success');
+        }).catch(function (error) {
+          setStatus(error.message, 'error');
+        });
+      }
+
+      function deleteRemoteApp(app) {
+        var host = hostInput ? hostInput.value.trim() : '';
+        var remoteRoot = remoteRootInput ? (remoteRootInput.value.trim() || '/data/homebrew') : '/data/homebrew';
+        var remotePath = trimTrailingSlashes(remoteRoot) + '/' + app.name;
+
+        if (!host) {
+          setStatus('Enter your PS5 IP first.', 'error');
+          return;
+        }
+
+        if (!confirm('Delete "' + remotePath + '" from the PS5? The local extracted copy in PKG Sender will stay.')) {
+          return;
+        }
+
+        setStatus('Deleting ' + remotePath + ' from PS5 with PS5Upload...');
+
+        requestJson(appActionUrl(app, 'delete-remote'), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            host: host,
+            remoteRoot: remoteRoot
+          })
+        }).then(function (data) {
+          var message = data.message || 'Remote homebrew deleted from PS5.';
+          if (data.opId) message += NL + 'PS5Upload op: ' + data.opId;
+          setStatus(message, 'success');
+        }).catch(function (error) {
+          setStatus(error.message, 'error');
+        });
+      }
+
+      function deleteApp(app) {
+        if (!confirm('Delete extracted app "' + app.name + '" from PKG Sender local Docker storage only? This does not remove it from the PS5.')) {
+          return;
+        }
+
+        setStatus('Deleting local extracted copy ' + app.name + '...');
+
+        requestJson('/api/ps5/homebrew/apps/' + encodeURIComponent(app.name), {
+          method: 'DELETE'
+        }).then(function (data) {
+          setStatus(data.message || 'Local homebrew app deleted.', 'success');
+          return loadApps();
+        }).catch(function (error) {
+          setStatus(error.message, 'error');
+        });
+      }
+
+      window.addEventListener('error', function (event) {
+        var message = event && event.message ? event.message : 'Unknown browser script error';
+        setStatus('Browser script error: ' + message, 'error');
+      });
+
+      if (fileInput) {
+        fileInput.addEventListener('change', function () {
+          var file = fileInput.files && fileInput.files[0];
+          if (file) {
+            setStatus('Selected ' + file.name + '. Click Upload and extract to continue.');
+          }
+        });
+      }
+
+      if (uploadBtn) {
+        uploadBtn.addEventListener('click', function (event) {
+          event.preventDefault();
+          uploadHomebrew();
+        });
+      }
+
+      if (refreshBtn) {
+        refreshBtn.addEventListener('click', function (event) {
+          event.preventDefault();
+          loadApps();
+        });
+      }
+
+      loadApps();
+    }());
+  </script>
+</body>
+</html>`;
+}
+
+
+
+function renderProsperoEdenPage() {
+  const uploadLimit = prosperoEdenUploadLimit;
+
+  return `<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Nintendo Switch / ProsperoEden - PKG Sender</title>
+  <link rel="stylesheet" href="/css/fontawesome.min.css">
+  <link rel="stylesheet" href="/css/solid.min.css">
+  <style>
+    ${renderPs5StandaloneNavCss()}
+
+    :root {
+      --bg: #07111f;
+      --panel: rgba(15, 23, 42, 0.86);
+      --panel-2: rgba(30, 41, 59, 0.64);
+      --border: rgba(255,255,255,0.14);
+      --text: #eef3ff;
+      --muted: #a9b8d4;
+      --blue: #3b82f6;
+      --green: #22c55e;
+      --red: #ef4444;
+      --yellow: #f59e0b;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: Inter, Segoe UI, Roboto, Arial, sans-serif;
+      color: var(--text);
+      background:
+        radial-gradient(circle at top left, rgba(239,68,68,.25), transparent 34rem),
+        radial-gradient(circle at bottom right, rgba(59,130,246,.20), transparent 38rem),
+        var(--bg);
+    }
+
+    .page { width: min(1360px, calc(100vw - 48px)); margin: 0 auto; padding: 18px 0 60px; }
+    .hero, .panel { border: 1px solid var(--border); background: var(--panel); border-radius: 26px; box-shadow: 0 24px 80px rgba(0,0,0,.32); backdrop-filter: blur(18px); }
+    .hero { padding: 28px; margin-bottom: 18px; }
+    .eyebrow { margin: 0 0 8px; color: #93c5fd; text-transform: uppercase; letter-spacing: .12em; font-size: .78rem; font-weight: 1000; }
+    h1, h2, h3, p { margin-top: 0; }
+    h1 { margin-bottom: 10px; font-size: clamp(2rem, 5vw, 4rem); line-height: .95; letter-spacing: -.07em; }
+    .muted { color: var(--muted); line-height: 1.55; }
+    .grid { display: grid; grid-template-columns: minmax(0, .9fr) minmax(0, 1.4fr); gap: 18px; align-items: start; }
+    .panel { padding: 20px; min-width: 0; }
+    .field { display: grid; gap: 7px; margin-bottom: 14px; }
+    label { color: var(--muted); font-size: .85rem; font-weight: 800; }
+    input[type="text"], input[type="file"], select { width: 100%; color: var(--text); background: rgba(2, 6, 23, .6); border: 1px solid var(--border); border-radius: 14px; padding: 12px 13px; outline: none; }
+    .btn { appearance: none; border: 0; cursor: pointer; border-radius: 14px; padding: 11px 14px; color: #fff; background: linear-gradient(135deg, #2563eb, #0ea5e9); font-weight: 950; display: inline-flex; align-items: center; justify-content: center; gap: 8px; text-decoration: none; white-space: nowrap; }
+    .btn.green { background: linear-gradient(135deg, #16a34a, #22c55e); }
+    .btn.red { background: linear-gradient(135deg, #dc2626, #ef4444); }
+    .btn.secondary { background: rgba(255,255,255,.10); border: 1px solid var(--border); }
+    .btn:disabled { opacity: .55; cursor: not-allowed; }
+    .status { min-height: 44px; margin-top: 14px; padding: 12px 14px; border-radius: 16px; border: 1px solid var(--border); background: rgba(255,255,255,.06); color: var(--muted); white-space: pre-wrap; overflow-wrap: anywhere; }
+    .status.success { color: #bbf7d0; border-color: rgba(34,197,94,.35); }
+    .status.error { color: #fecaca; border-color: rgba(239,68,68,.40); }
+    .help-box { padding: 14px; margin: 14px 0; color: #dbeafe; border: 1px solid rgba(125,211,252,.25); border-radius: 16px; background: rgba(14,165,233,.08); line-height: 1.55; }
+    .target-grid { display: grid; gap: 10px; grid-template-columns: repeat(2, minmax(0, 1fr)); margin-bottom: 14px; }
+    .target-card { display: grid; gap: 4px; padding: 12px; border: 1px solid var(--border); border-radius: 16px; background: var(--panel-2); cursor: pointer; }
+    .target-card span { color: var(--text); font-weight: 950; }
+    .target-card small { color: var(--muted); overflow-wrap: anywhere; }
+    .upload-list, .remote-list { display: grid; gap: 10px; margin-top: 14px; }
+    .upload-item, .remote-item { padding: 12px 14px; border: 1px solid var(--border); border-radius: 16px; background: var(--panel-2); color: var(--muted); overflow-wrap: anywhere; }
+    .upload-item.success { color: #bbf7d0; }
+    .upload-item.error { color: #fecaca; }
+    .remote-item { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 10px; }
+    .remote-item strong { color: var(--text); overflow-wrap: anywhere; }
+    .remote-actions { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+    .empty { padding: 22px; text-align: center; color: var(--muted); border: 1px dashed var(--border); border-radius: 18px; }
+    .section-stack { display: grid; gap: 18px; }
+    @media (max-width: 900px) { .grid, .target-grid { grid-template-columns: 1fr; } .remote-item { grid-template-columns: 1fr; } .remote-actions { justify-content: flex-start; } }
+  </style>
+</head>
+<body>
+  <main class="page">
+    ${renderPs5NavBar('switch')}
+
+    <section class="hero">
+      <p class="eyebrow">ProsperoEden</p>
+      <h1>Nintendo Switch manager</h1>
+      <p class="muted">
+        Upload your own dumped keys, firmware files, updates and mods to <strong>/data/prosperoeden</strong> through PS5Upload.
+        You can also list and delete ROMs currently stored in <strong>${escapeHtml(switchGameRemoteRoot)}</strong>.
+      </p>
+    </section>
+
+    <section class="grid">
+      <article class="panel">
+        <p class="eyebrow">Target</p>
+        <h2>PS5Upload settings</h2>
+
+        <div class="field">
+          <label for="ps5Host">PS5 IP / host</label>
+          <input id="ps5Host" type="text" value="${escapeHtml(currentPS5ipadr || '')}" placeholder="192.168.1.110">
+        </div>
+
+        <div class="help-box">
+          PS5Upload must be running on the PS5. Files are transferred from this container to the selected folder on the PS5.
+        </div>
+
+        <p class="eyebrow">Folders</p>
+        <div class="target-grid">
+          <label class="target-card"><input type="radio" name="target" value="keys" checked><span>Keys</span><small>${escapeHtml(prosperoEdenFolders.keys)}</small></label>
+          <label class="target-card"><input type="radio" name="target" value="firmware"><span>Firmware</span><small>${escapeHtml(prosperoEdenFolders.firmware)}</small></label>
+          <label class="target-card"><input type="radio" name="target" value="updates"><span>Updates</span><small>${escapeHtml(prosperoEdenFolders.updates)}</small></label>
+          <label class="target-card"><input type="radio" name="target" value="mods"><span>Mods</span><small>${escapeHtml(prosperoEdenFolders.mods)}</small></label>
+        </div>
+      </article>
+
+      <div class="section-stack">
+        <article class="panel">
+          <p class="eyebrow">Upload</p>
+          <h2>Add files to ProsperoEden</h2>
+
+          <div class="field">
+            <label for="prosperoFiles">Files</label>
+            <input id="prosperoFiles" type="file" multiple>
+          </div>
+
+          <div class="field">
+            <label for="prosperoFolder">Folder upload, useful for mods</label>
+            <input id="prosperoFolder" type="file" webkitdirectory directory multiple>
+          </div>
+
+          <button class="btn green" id="uploadBtn" type="button">
+            <i class="fa-solid fa-cloud-arrow-up"></i>
+            Upload selected files
+          </button>
+
+          <p class="muted" style="margin-top:12px">
+            Max per file: ${escapeHtml(uploadLimit)}. Keys should be <strong>prod.keys</strong> or <strong>title.keys</strong>.
+          </p>
+
+          <div class="status" id="statusBox">Ready.</div>
+          <div class="upload-list" id="uploadList"></div>
+        </article>
+
+        <article class="panel">
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">
+            <div>
+              <p class="eyebrow">Remote ROMs</p>
+              <h2 style="margin:0">ProsperoEden roms</h2>
+              <p class="muted" style="margin:6px 0 0">${escapeHtml(switchGameRemoteRoot)}</p>
+            </div>
+            <button class="btn secondary" id="refreshRomsBtn" type="button">
+              <i class="fa-solid fa-rotate"></i>
+              Refresh roms
+            </button>
+          </div>
+
+          <div class="remote-list" id="romList">
+            <div class="empty">Loading rom list...</div>
+          </div>
+        </article>
+      </div>
+    </section>
+  </main>
+
+  <script>
     const statusBox = document.getElementById('statusBox');
+    const uploadList = document.getElementById('uploadList');
     const uploadBtn = document.getElementById('uploadBtn');
-    const refreshBtn = document.getElementById('refreshBtn');
-    const fileInput = document.getElementById('homebrewFile');
+    const filesInput = document.getElementById('prosperoFiles');
+    const folderInput = document.getElementById('prosperoFolder');
     const hostInput = document.getElementById('ps5Host');
-    const portInput = document.getElementById('ps5Port');
-    const remoteRootInput = document.getElementById('remoteRoot');
-    const ftpUserInput = document.getElementById('ftpUser');
-    const ftpPassInput = document.getElementById('ftpPass');
+    const romList = document.getElementById('romList');
+    const refreshRomsBtn = document.getElementById('refreshRomsBtn');
 
     function setStatus(message, type) {
       statusBox.className = 'status ' + (type || '');
@@ -2448,13 +4891,7 @@ function renderPs5HomebrewPage() {
 
     function escapeText(value) {
       return String(value || '').replace(/[&<>"']/g, function (char) {
-        return {
-          '&': '&amp;',
-          '<': '&lt;',
-          '>': '&gt;',
-          '"': '&quot;',
-          "'": '&#39;'
-        }[char];
+        return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char];
       });
     }
 
@@ -2468,151 +4905,633 @@ function renderPs5HomebrewPage() {
           var data = {};
           try { data = text ? JSON.parse(text) : {}; }
           catch (error) { data = { message: text }; }
-
-          if (!response.ok) {
-            throw new Error(data.message || data.error || response.statusText);
-          }
-
+          if (!response.ok) throw new Error(data.message || data.error || response.statusText);
           return data;
         });
       });
     }
 
-    function appActionUrl(app, action) {
-      return '/api/ps5/homebrew/apps/' + encodeURIComponent(app.name) + '/' + action;
+    function selectedTarget() {
+      var input = document.querySelector('input[name="target"]:checked');
+      return input ? input.value : 'keys';
     }
 
-    function renderApps(apps) {
-      listEl.innerHTML = '';
+    function addUploadItem(file, message, type) {
+      var item = document.createElement('div');
+      item.className = 'upload-item ' + (type || '');
+      item.innerHTML = '<strong>' + escapeText(file.name || file.webkitRelativePath || 'file') + '</strong><br>' + escapeText(message || '');
+      uploadList.prepend(item);
+    }
 
-      if (!apps.length) {
-        listEl.innerHTML = '<div class="empty">No homebrew apps extracted yet.</div>';
-        return;
-      }
+    function allSelectedFiles() {
+      var files = [];
+      Array.prototype.slice.call(filesInput.files || []).forEach(function (file) { files.push(file); });
+      Array.prototype.slice.call(folderInput.files || []).forEach(function (file) { files.push(file); });
+      return files;
+    }
 
-      apps.forEach(function (app) {
-        var item = document.createElement('div');
-        item.className = 'homebrew-item';
+    function uploadOne(file, index, total) {
+      var target = selectedTarget();
+      var host = hostInput.value.trim();
+      var relativePath = file.webkitRelativePath || file.name;
+      var url = '/api/ps5/prosperoeden/upload?target=' + encodeURIComponent(target);
+      if (host) url += '&host=' + encodeURIComponent(host);
 
-        var title = app.titleId ? app.name + ' · ' + app.titleId : app.name;
-        var meta = app.sizeLabel + ' · ' + app.fileCount + ' file(s) · Modified ' + new Date(app.modifiedAt).toLocaleString();
+      setStatus('Uploading ' + (index + 1) + '/' + total + ': ' + relativePath + '...');
 
-        item.innerHTML =
-          '<div class="homebrew-name">' +
-            '<strong>' + escapeText(title) + '</strong>' +
-            '<small class="muted">' + escapeText(meta) + '</small>' +
-          '</div>' +
-          '<div class="homebrew-actions">' +
-            '<button class="btn green" type="button" data-action="deploy"><i class="fa-solid fa-cloud-arrow-up"></i> Deploy to PS5</button>' +
-            '<button class="btn red" type="button" data-action="delete"><i class="fa-solid fa-trash"></i> Delete</button>' +
-          '</div>';
-
-        item.querySelector('[data-action="deploy"]').addEventListener('click', function () {
-          deployApp(app);
+      return file.arrayBuffer().then(function (buffer) {
+        return requestJson(url, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/octet-stream',
+            'x-prospero-target': target,
+            'x-prospero-filename': encodeURIComponent(file.name),
+            'x-prospero-relative-path': encodeURIComponent(relativePath),
+            'x-ps5-host': host
+          },
+          body: buffer
         });
-
-        item.querySelector('[data-action="delete"]').addEventListener('click', function () {
-          deleteApp(app);
-        });
-
-        listEl.appendChild(item);
+      }).then(function (data) {
+        addUploadItem(file, data.message || ('Uploaded to ' + (data.remotePath || target)), 'success');
+        if (target === 'roms') loadRoms();
+      }).catch(function (error) {
+        addUploadItem(file, error.message, 'error');
+        throw error;
       });
     }
 
-    function loadApps() {
-      setStatus('Loading homebrew app list...');
-      return requestJson('/api/ps5/homebrew/apps')
-        .then(function (data) {
-          renderApps(data.apps || []);
-          setStatus('Ready.');
-        })
-        .catch(function (error) {
-          setStatus(error.message, 'error');
-        });
-    }
+    function uploadSelected() {
+      var files = allSelectedFiles();
 
-    function uploadHomebrew() {
-      var file = fileInput.files && fileInput.files[0];
-
-      if (!file) {
-        setStatus('Choose a .zip file first.', 'error');
+      if (!files.length) {
+        setStatus('Choose files or a folder first.', 'error');
         return;
       }
 
       uploadBtn.disabled = true;
-      setStatus('Uploading and extracting ' + file.name + '...');
+      uploadList.innerHTML = '';
 
-      file.arrayBuffer()
-        .then(function (buffer) {
-          return requestJson('/api/ps5/homebrew/upload', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/octet-stream',
-              'x-homebrew-filename': encodeURIComponent(file.name)
-            },
-            body: buffer
-          });
-        })
-        .then(function (data) {
-          setStatus(data.message || 'Homebrew ZIP uploaded and extracted.', 'success');
-          fileInput.value = '';
-          return loadApps();
-        })
-        .catch(function (error) {
-          setStatus(error.message, 'error');
-        })
-        .finally(function () {
-          uploadBtn.disabled = false;
-        });
+      var chain = Promise.resolve();
+      files.forEach(function (file, index) {
+        chain = chain.then(function () { return uploadOne(file, index, files.length); });
+      });
+
+      chain.then(function () {
+        setStatus('Uploaded ' + files.length + ' file(s).', 'success');
+        filesInput.value = '';
+        folderInput.value = '';
+      }).catch(function (error) {
+        setStatus(error.message || 'Upload failed.', 'error');
+      }).finally(function () {
+        uploadBtn.disabled = false;
+      });
     }
 
-    function deployApp(app) {
+    function loadRoms() {
       var host = hostInput.value.trim();
-      var port = portInput.value.trim();
-      var remoteRoot = remoteRootInput.value.trim() || '/data/homebrew';
+      var url = '/api/ps5/prosperoeden/roms';
+      if (host) url += '?host=' + encodeURIComponent(host);
 
-      if (!host) {
-        setStatus('Enter your PS5 IP first.', 'error');
+      romList.innerHTML = '<div class="empty">Loading rom list...</div>';
+
+      return requestJson(url).then(function (data) {
+        renderRoms(data.roms || []);
+      }).catch(function (error) {
+        romList.innerHTML = '<div class="empty">' + escapeText(error.message) + '</div>';
+      });
+    }
+
+    function renderRoms(roms) {
+      romList.innerHTML = '';
+
+      if (!roms.length) {
+        romList.innerHTML = '<div class="empty">No roms found in ProsperoEden roms folder.</div>';
         return;
       }
 
-      setStatus('Deploying ' + app.name + ' to ' + host + ':' + port + remoteRoot + '/' + app.name + '...');
+      roms.forEach(function (rom) {
+        var item = document.createElement('div');
+        item.className = 'remote-item';
+        item.innerHTML =
+          '<div>' +
+            '<strong>' + escapeText(rom.name) + '</strong>' +
+            '<div class="muted">' + escapeText(rom.sizeLabel || '') + ' · ' + escapeText(rom.path || '') + '</div>' +
+          '</div>' +
+          '<div class="remote-actions">' +
+            '<button class="btn red" type="button" data-action="delete-rom"><i class="fa-solid fa-trash"></i> Delete</button>' +
+          '</div>';
 
-      requestJson(appActionUrl(app, 'deploy'), {
+        item.querySelector('[data-action="delete-rom"]').addEventListener('click', function () {
+          deleteRom(rom);
+        });
+
+        romList.appendChild(item);
+      });
+    }
+
+    function deleteRom(rom) {
+      var host = hostInput.value.trim();
+
+      if (!confirm('Delete "' + rom.path + '" from ProsperoEden roms?')) return;
+
+      setStatus('Deleting ' + rom.name + ' from ProsperoEden roms...');
+
+      requestJson('/api/ps5/prosperoeden/roms/delete', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          host: host,
-          port: port,
-          remoteRoot: remoteRoot,
-          username: ftpUserInput.value.trim(),
-          password: ftpPassInput.value
-        })
+        body: JSON.stringify({ host: host, path: rom.path })
       }).then(function (data) {
-        setStatus((data.message || 'Deploy finished.') + '\\nRemote path: ' + (data.remotePath || '') + '\\nFiles: ' + (data.uploaded || 0) + '/' + (data.total || 0), 'success');
+        setStatus(data.message || 'Rom deleted.', 'success');
+        return loadRoms();
       }).catch(function (error) {
         setStatus(error.message, 'error');
       });
     }
 
-    function deleteApp(app) {
-      if (!confirm('Delete extracted app "' + app.name + '" from the Docker container?')) return;
+    uploadBtn.addEventListener('click', uploadSelected);
+    refreshRomsBtn.addEventListener('click', loadRoms);
+    loadRoms();
+  </script>
+</body>
+</html>`;
+}
 
-      setStatus('Deleting ' + app.name + '...');
+function renderPs5sx2Page() {
+  const uploadLimit = ps5sx2UploadLimit;
 
-      requestJson('/api/ps5/homebrew/apps/' + encodeURIComponent(app.name), {
-        method: 'DELETE'
+  return `<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>PS5SX2 Manager - PKG Sender</title>
+  <link rel="stylesheet" href="/css/fontawesome.min.css">
+  <link rel="stylesheet" href="/css/solid.min.css">
+  <style>
+    ${renderPs5StandaloneNavCss()}
+
+    :root {
+      --bg: #07111f;
+      --panel: rgba(15, 23, 42, 0.86);
+      --panel-2: rgba(30, 41, 59, 0.64);
+      --border: rgba(255,255,255,0.14);
+      --text: #eef3ff;
+      --muted: #a9b8d4;
+      --blue: #3b82f6;
+      --green: #22c55e;
+      --red: #ef4444;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: Inter, Segoe UI, Roboto, Arial, sans-serif;
+      color: var(--text);
+      background:
+        radial-gradient(circle at top left, rgba(59,130,246,.30), transparent 34rem),
+        radial-gradient(circle at bottom right, rgba(168,85,247,.18), transparent 38rem),
+        var(--bg);
+    }
+
+    .page { width: min(1360px, calc(100vw - 48px)); margin: 0 auto; padding: 18px 0 60px; }
+    .hero, .panel { border: 1px solid var(--border); background: var(--panel); border-radius: 26px; box-shadow: 0 24px 80px rgba(0,0,0,.32); backdrop-filter: blur(18px); }
+    .hero { padding: 28px; margin-bottom: 18px; }
+    .eyebrow { margin: 0 0 8px; color: #93c5fd; text-transform: uppercase; letter-spacing: .12em; font-size: .78rem; font-weight: 1000; }
+    h1, h2, h3, p { margin-top: 0; }
+    h1 { margin-bottom: 10px; font-size: clamp(2rem, 5vw, 4rem); line-height: .95; letter-spacing: -.07em; }
+    .muted { color: var(--muted); line-height: 1.55; }
+    .grid { display: grid; grid-template-columns: minmax(0, .9fr) minmax(0, 1.4fr); gap: 18px; align-items: start; }
+    .panel { padding: 20px; min-width: 0; }
+    .field { display: grid; gap: 7px; margin-bottom: 14px; }
+    label { color: var(--muted); font-size: .85rem; font-weight: 800; }
+    input[type="text"], input[type="file"] { width: 100%; color: var(--text); background: rgba(2, 6, 23, .6); border: 1px solid var(--border); border-radius: 14px; padding: 12px 13px; outline: none; }
+    .btn { appearance: none; border: 0; cursor: pointer; border-radius: 14px; padding: 11px 14px; color: #fff; background: linear-gradient(135deg, #2563eb, #0ea5e9); font-weight: 950; display: inline-flex; align-items: center; justify-content: center; gap: 8px; text-decoration: none; white-space: nowrap; }
+    .btn.green { background: linear-gradient(135deg, #16a34a, #22c55e); }
+    .btn.red { background: linear-gradient(135deg, #dc2626, #ef4444); }
+    .btn.secondary { background: rgba(255,255,255,.10); border: 1px solid var(--border); }
+    .btn:disabled { opacity: .55; cursor: not-allowed; }
+    .status { min-height: 44px; margin-top: 14px; padding: 12px 14px; border-radius: 16px; border: 1px solid var(--border); background: rgba(255,255,255,.06); color: var(--muted); white-space: pre-wrap; overflow-wrap: anywhere; }
+    .status.success { color: #bbf7d0; border-color: rgba(34,197,94,.35); }
+    .status.error { color: #fecaca; border-color: rgba(239,68,68,.40); }
+    .help-box { padding: 14px; margin: 14px 0; color: #dbeafe; border: 1px solid rgba(125,211,252,.25); border-radius: 16px; background: rgba(14,165,233,.08); line-height: 1.55; }
+    .upload-list, .remote-list { display: grid; gap: 10px; margin-top: 14px; }
+    .upload-item, .remote-item { padding: 12px; border: 1px solid var(--border); background: var(--panel-2); border-radius: 14px; color: var(--muted); overflow-wrap: anywhere; }
+    .upload-item.success { border-color: rgba(34,197,94,.35); color: #bbf7d0; }
+    .upload-item.error { border-color: rgba(239,68,68,.40); color: #fecaca; }
+    .remote-item { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 10px; }
+    .remote-item strong { color: var(--text); overflow-wrap: anywhere; }
+    .remote-actions { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+    .empty { padding: 22px; text-align: center; color: var(--muted); border: 1px dashed var(--border); border-radius: 18px; }
+    .section-stack { display: grid; gap: 18px; }
+
+    @media (max-width: 900px) { .grid { grid-template-columns: 1fr; } .remote-item { grid-template-columns: 1fr; } .remote-actions { justify-content: flex-start; } }
+  </style>
+</head>
+<body>
+  <main class="page">
+    ${renderPs5NavBar('ps5sx2')}
+
+    <section class="hero">
+      <p class="eyebrow">PS5SX2 / PCSX2</p>
+      <h1>PS5SX2 manager</h1>
+      <p class="muted">
+        Upload your own legally dumped PS2 BIOS files to <strong>${escapeHtml(pcsx2BiosRemoteDir)}</strong>,
+        and manage PS2 games stored in <strong>${escapeHtml(ps2GameRemoteRoot)}</strong> on the PS5.
+      </p>
+    </section>
+
+    <section class="grid">
+      <article class="panel">
+        <p class="eyebrow">Target</p>
+        <h2>Deploy settings</h2>
+
+        <div class="field">
+          <label for="ps5Host">PS5 IP / host</label>
+          <input id="ps5Host" type="text" value="${escapeHtml(currentPS5ipadr || '')}" placeholder="192.168.1.110">
+        </div>
+
+        <div class="field">
+          <label>Remote BIOS folder</label>
+          <input type="text" value="${escapeHtml(pcsx2BiosRemoteDir)}" readonly>
+        </div>
+
+        <div class="field">
+          <label>Remote games folder</label>
+          <input type="text" value="${escapeHtml(ps2GameRemoteRoot)}" readonly>
+        </div>
+
+        <div class="help-box">
+          PS5Upload must be running on the PS5. Use this page to upload BIOS files and delete PS2 games from the PS5SX2 games folder.
+        </div>
+
+        <p class="muted">
+          Accepted BIOS/support extensions: <strong>${escapeHtml(pcsx2BiosExtensions.join(', '))}</strong>. Extensionless support files are also allowed.
+        </p>
+      </article>
+
+      <div class="section-stack">
+        <article class="panel">
+          <p class="eyebrow">Upload</p>
+          <h2>Add BIOS files</h2>
+
+          <div class="field">
+            <label for="biosFiles">BIOS files</label>
+            <input id="biosFiles" type="file" multiple>
+          </div>
+
+          <div class="field">
+            <label for="biosFolder">Folder upload, optional</label>
+            <input id="biosFolder" type="file" webkitdirectory directory multiple>
+          </div>
+
+          <button class="btn green" id="uploadBtn" type="button">
+            <i class="fa-solid fa-cloud-arrow-up"></i>
+            Upload BIOS files
+          </button>
+
+          <p class="muted" style="margin-top:12px">
+            Max per file: ${escapeHtml(uploadLimit)}.
+          </p>
+
+          <div class="status" id="statusBox">Ready.</div>
+          <div class="upload-list" id="uploadList"></div>
+        </article>
+
+        <article class="panel">
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">
+            <div>
+              <p class="eyebrow">Remote games</p>
+              <h2 style="margin:0">PCSX2 games</h2>
+              <p class="muted" style="margin:6px 0 0">${escapeHtml(ps2GameRemoteRoot)}</p>
+            </div>
+            <button class="btn secondary" id="refreshGamesBtn" type="button">
+              <i class="fa-solid fa-rotate"></i>
+              Refresh games
+            </button>
+          </div>
+
+          <div class="remote-list" id="gameList">
+            <div class="empty">Loading game list...</div>
+          </div>
+        </article>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    const statusBox = document.getElementById('statusBox');
+    const uploadList = document.getElementById('uploadList');
+    const uploadBtn = document.getElementById('uploadBtn');
+    const filesInput = document.getElementById('biosFiles');
+    const folderInput = document.getElementById('biosFolder');
+    const hostInput = document.getElementById('ps5Host');
+    const gameList = document.getElementById('gameList');
+    const refreshGamesBtn = document.getElementById('refreshGamesBtn');
+
+    function setStatus(message, type) {
+      statusBox.className = 'status ' + (type || '');
+      statusBox.textContent = message || '';
+    }
+
+    function escapeText(value) {
+      return String(value || '').replace(/[&<>"']/g, function (char) {
+        return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char];
+      });
+    }
+
+    function requestJson(url, options) {
+      options = options || {};
+      options.headers = options.headers || {};
+      options.headers.Accept = 'application/json';
+
+      return fetch(url, options).then(function (response) {
+        return response.text().then(function (text) {
+          var data = {};
+          try { data = text ? JSON.parse(text) : {}; }
+          catch (error) { data = { message: text }; }
+          if (!response.ok) throw new Error(data.message || data.error || response.statusText);
+          return data;
+        });
+      });
+    }
+
+    function addUploadItem(file, message, type) {
+      var item = document.createElement('div');
+      item.className = 'upload-item ' + (type || '');
+      item.innerHTML = '<strong>' + escapeText(file.webkitRelativePath || file.name || 'file') + '</strong><br>' + escapeText(message || '');
+      uploadList.prepend(item);
+    }
+
+    function allSelectedFiles() {
+      var files = [];
+      Array.prototype.slice.call(filesInput.files || []).forEach(function (file) { files.push(file); });
+      Array.prototype.slice.call(folderInput.files || []).forEach(function (file) { files.push(file); });
+      return files;
+    }
+
+    function uploadOne(file, index, total) {
+      var host = hostInput.value.trim();
+      var relativePath = file.webkitRelativePath || file.name;
+      var url = '/api/ps5/ps5sx2/bios/upload';
+      if (host) url += '?host=' + encodeURIComponent(host);
+
+      setStatus('Uploading ' + (index + 1) + '/' + total + ': ' + relativePath + '...');
+
+      return file.arrayBuffer().then(function (buffer) {
+        return requestJson(url, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/octet-stream',
+            'x-ps5sx2-filename': encodeURIComponent(file.name),
+            'x-ps5sx2-relative-path': encodeURIComponent(relativePath),
+            'x-ps5-host': host
+          },
+          body: buffer
+        });
       }).then(function (data) {
-        setStatus(data.message || 'Homebrew app deleted.', 'success');
-        return loadApps();
+        addUploadItem(file, data.message || ('Uploaded to ' + (data.remotePath || 'BIOS folder')), 'success');
+      }).catch(function (error) {
+        addUploadItem(file, error.message, 'error');
+        throw error;
+      });
+    }
+
+    function uploadSelected() {
+      var files = allSelectedFiles();
+
+      if (!files.length) {
+        setStatus('Choose BIOS files or a folder first.', 'error');
+        return;
+      }
+
+      uploadBtn.disabled = true;
+      uploadList.innerHTML = '';
+
+      var chain = Promise.resolve();
+      files.forEach(function (file, index) {
+        chain = chain.then(function () { return uploadOne(file, index, files.length); });
+      });
+
+      chain.then(function () {
+        setStatus('Uploaded ' + files.length + ' BIOS file(s).', 'success');
+        filesInput.value = '';
+        folderInput.value = '';
+      }).catch(function (error) {
+        setStatus(error.message || 'Upload failed.', 'error');
+      }).finally(function () {
+        uploadBtn.disabled = false;
+      });
+    }
+
+    function loadGames() {
+      var host = hostInput.value.trim();
+      var url = '/api/ps5/ps5sx2/games';
+      if (host) url += '?host=' + encodeURIComponent(host);
+
+      gameList.innerHTML = '<div class="empty">Loading game list...</div>';
+
+      return requestJson(url).then(function (data) {
+        renderGames(data.games || []);
+      }).catch(function (error) {
+        gameList.innerHTML = '<div class="empty">' + escapeText(error.message) + '</div>';
+      });
+    }
+
+    function renderGames(games) {
+      gameList.innerHTML = '';
+
+      if (!games.length) {
+        gameList.innerHTML = '<div class="empty">No PS2 games found in PCSX2 games folder.</div>';
+        return;
+      }
+
+      games.forEach(function (game) {
+        var item = document.createElement('div');
+        item.className = 'remote-item';
+        item.innerHTML =
+          '<div>' +
+            '<strong>' + escapeText(game.name) + '</strong>' +
+            '<div class="muted">' + escapeText(game.sizeLabel || '') + ' · ' + escapeText(game.path || '') + '</div>' +
+          '</div>' +
+          '<div class="remote-actions">' +
+            '<button class="btn red" type="button" data-action="delete-game"><i class="fa-solid fa-trash"></i> Delete</button>' +
+          '</div>';
+
+        item.querySelector('[data-action="delete-game"]').addEventListener('click', function () {
+          deleteGame(game);
+        });
+
+        gameList.appendChild(item);
+      });
+    }
+
+    function deleteGame(game) {
+      var host = hostInput.value.trim();
+
+      if (!confirm('Delete "' + game.path + '" from PCSX2 games?')) return;
+
+      setStatus('Deleting ' + game.name + ' from PCSX2 games...');
+
+      requestJson('/api/ps5/ps5sx2/games/delete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ host: host, path: game.path })
+      }).then(function (data) {
+        setStatus(data.message || 'Game deleted.', 'success');
+        return loadGames();
       }).catch(function (error) {
         setStatus(error.message, 'error');
       });
     }
 
-    uploadBtn.addEventListener('click', uploadHomebrew);
-    refreshBtn.addEventListener('click', loadApps);
-    loadApps();
+    uploadBtn.addEventListener('click', uploadSelected);
+    refreshGamesBtn.addEventListener('click', loadGames);
+    loadGames();
+  </script>
+</body>
+</html>`;
+}
+
+
+function renderPs5LinksPage() {
+  const escapedHost = escapeHtml(currentPS5ipadr || '');
+
+  return `<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>PS5 Links - PKG Sender</title>
+  <link rel="stylesheet" href="/css/fontawesome.min.css">
+  <link rel="stylesheet" href="/css/solid.min.css">
+  <style>
+    ${renderPs5StandaloneNavCss()}
+
+    :root {
+      --bg: #07111f;
+      --panel: rgba(15, 23, 42, 0.86);
+      --panel-2: rgba(30, 41, 59, 0.64);
+      --border: rgba(255,255,255,0.14);
+      --text: #eef3ff;
+      --muted: #a9b8d4;
+    }
+
+    * { box-sizing: border-box; }
+    body { margin: 0; min-height: 100vh; font-family: Inter, Segoe UI, Roboto, Arial, sans-serif; color: var(--text); background: radial-gradient(circle at top left, rgba(59,130,246,.32), transparent 34rem), radial-gradient(circle at bottom right, rgba(34,197,94,.18), transparent 38rem), var(--bg); }
+    .page { width: min(1220px, calc(100vw - 48px)); margin: 0 auto; padding: 18px 0 60px; }
+    .hero, .panel { border: 1px solid var(--border); background: var(--panel); border-radius: 26px; box-shadow: 0 24px 80px rgba(0,0,0,.32); backdrop-filter: blur(18px); }
+    .hero { padding: 28px; margin-bottom: 18px; }
+    .eyebrow { margin: 0 0 8px; color: #93c5fd; text-transform: uppercase; letter-spacing: .12em; font-size: .78rem; font-weight: 1000; }
+    h1, h2, h3, p { margin-top: 0; }
+    h1 { margin-bottom: 10px; font-size: clamp(2rem, 5vw, 4rem); line-height: .95; letter-spacing: -.07em; }
+    .muted { color: var(--muted); line-height: 1.55; }
+    .panel { padding: 22px; }
+    .field { display: grid; gap: 7px; margin-bottom: 18px; }
+    label { color: var(--muted); font-size: .85rem; font-weight: 800; }
+    input[type="text"] { width: 100%; color: var(--text); background: rgba(2, 6, 23, .6); border: 1px solid var(--border); border-radius: 14px; padding: 12px 13px; outline: none; }
+    .links-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; margin-top: 18px; }
+    .link-card { display: grid; gap: 10px; min-height: 190px; padding: 18px; color: var(--text); text-decoration: none; border: 1px solid var(--border); border-radius: 22px; background: var(--panel-2); transition: transform .18s ease, border-color .18s ease, background .18s ease; }
+    .link-card:hover { transform: translateY(-3px); border-color: rgba(125,211,252,.42); background: rgba(30,41,59,.86); color: var(--text); }
+    .link-icon { width: 46px; height: 46px; display: grid; place-items: center; border-radius: 16px; background: rgba(59,130,246,.22); color: #bfdbfe; font-size: 1.25rem; }
+    .link-card strong { font-size: 1.15rem; }
+    .link-card small { color: var(--muted); overflow-wrap: anywhere; line-height: 1.45; }
+    .status { min-height: 44px; margin-top: 14px; padding: 12px 14px; border-radius: 16px; border: 1px solid var(--border); background: rgba(255,255,255,.06); color: var(--muted); white-space: pre-wrap; overflow-wrap: anywhere; }
+    @media (max-width: 900px) { .links-grid { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+  <main class="page">
+    ${renderPs5NavBar('links')}
+
+    <section class="hero">
+      <p class="eyebrow">PS5</p>
+      <h1>PS5 links</h1>
+      <p class="muted">Open web interfaces running directly on the PS5. The links update when you change the PS5 IP / host.</p>
+    </section>
+
+    <section class="panel">
+      <div class="field">
+        <label for="ps5Host">PS5 IP / host</label>
+        <input id="ps5Host" type="text" value="${escapedHost}" placeholder="192.168.1.110">
+      </div>
+
+      <div class="links-grid">
+        <a class="link-card" id="pldmgrLink" href="#" target="_blank" rel="noopener"><span class="link-icon"><i class="fa-solid fa-list-check"></i></span><strong>PLDMGR</strong><small>Payload Manager web UI on port 8084.</small></a>
+        <a class="link-card" id="retroarchLink" href="#" target="_blank" rel="noopener"><span class="link-icon"><i class="fa-solid fa-gamepad"></i></span><strong>RetroArch WebUI</strong><small>RetroArch remote/web interface on port 6769.</small></a>
+        <a class="link-card" id="ps5FileWebuiLink" href="#" target="_blank" rel="noopener"><span class="link-icon"><i class="fa-solid fa-folder-open"></i></span><strong>PS5 File WebUI</strong><small>PS5 file web UI manager on port 8888.</small></a>
+      </div>
+
+      <div class="status" id="statusBox">Enter PS5 IP and open a link.</div>
+    </section>
+  </main>
+
+  <script>
+    (function () {
+      'use strict';
+
+      var hostInput = document.getElementById('ps5Host');
+      var statusBox = document.getElementById('statusBox');
+      var pldmgrLink = document.getElementById('pldmgrLink');
+      var retroarchLink = document.getElementById('retroarchLink');
+      var ps5FileWebuiLink = document.getElementById('ps5FileWebuiLink');
+
+      function cleanHost(value) {
+        var host = String(value || '').trim();
+        var protocolIndex = host.indexOf('://');
+
+        if (protocolIndex >= 0) {
+          host = host.slice(protocolIndex + 3);
+        }
+
+        var slashIndex = host.indexOf('/');
+
+        if (slashIndex >= 0) {
+          host = host.slice(0, slashIndex);
+        }
+
+        var colonIndex = host.lastIndexOf(':');
+
+        if (colonIndex > 0) {
+          host = host.slice(0, colonIndex);
+        }
+
+        return host.trim();
+      }
+
+      function setLink(anchor, host, port) {
+        if (!anchor) return;
+
+        if (!host) {
+          anchor.href = '#';
+          anchor.title = 'Enter your PS5 IP first';
+          return;
+        }
+
+        anchor.href = 'http://' + host + ':' + port + '/';
+        anchor.title = anchor.href;
+      }
+
+      function updateLinks() {
+        var host = cleanHost(hostInput ? hostInput.value : '');
+
+        setLink(pldmgrLink, host, 8084);
+        setLink(retroarchLink, host, 6769);
+        setLink(ps5FileWebuiLink, host, 8888);
+
+        if (statusBox) {
+          statusBox.textContent = host ? ('Links are using PS5 host: ' + host) : 'Enter PS5 IP and open a link.';
+        }
+      }
+
+      if (hostInput) {
+        hostInput.addEventListener('input', updateLinks);
+        hostInput.addEventListener('change', updateLinks);
+      }
+
+      updateLinks();
+    }());
   </script>
 </body>
 </html>`;
@@ -2837,6 +5756,35 @@ function renderPs5PayloadPage() {
       border-radius: 18px;
     }
 
+    .checkrow {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      padding: 12px;
+      margin: 10px 0 14px;
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      background: rgba(255,255,255,.05);
+      color: var(--muted);
+      line-height: 1.45;
+    }
+
+    .checkrow input {
+      width: 18px;
+      height: 18px;
+      margin-top: 2px;
+    }
+
+    .help-box {
+      padding: 14px;
+      margin: 14px 0;
+      color: #dbeafe;
+      border: 1px solid rgba(125, 211, 252, 0.25);
+      border-radius: 16px;
+      background: rgba(14, 165, 233, 0.08);
+      line-height: 1.55;
+    }
+
     @media (max-width: 880px) {
       .grid { grid-template-columns: 1fr; }
       .payload-item { grid-template-columns: 1fr; }
@@ -2852,8 +5800,9 @@ ${renderPs5NavBar('payloads')}
       <p class="eyebrow">PS5</p>
       <h1>Payload / ELF manager</h1>
       <p class="muted">
-        Upload, list, delete, download, and send PS5 payload files to the ELF loader port.
-        Allowed files: <strong>.elf</strong>, <strong>.bin</strong>, and <strong>.payload</strong>.
+        Upload, list, delete, download, and send PS5 payload files.
+        New uploads can also be copied into <strong>Payload Manager</strong> on port <strong>${ps5PayloadManagerPort}</strong>,
+        so they appear at <strong>http://${escapeHtml(currentPS5ipadr || 'PS5-IP')}:${ps5PayloadManagerPort}/</strong>.
       </p>
     </section>
 
@@ -2876,6 +5825,46 @@ ${renderPs5NavBar('payloads')}
           Max upload size: ${escapeHtml(payloadLimit)}.
           The payload is sent as raw bytes over TCP to the configured host and port.
         </p>
+
+        <div class="help-box">
+          To send payloads from this page, the PS5 must already have <strong>elfldr / ELF loader</strong>
+          running and listening on port <strong>9021</strong>. If you are using your current ps5upload setup,
+          load/enable elfldr first, then use this page to send extra <strong>.elf</strong>, <strong>.bin</strong>,
+          or <strong>.payload</strong> files.
+        </div>
+
+        <div class="help-box">
+          <strong>Payload Manager integration:</strong> sending to port 9021 executes the payload in memory only.
+          To make the payload show in <strong>http://${escapeHtml(currentPS5ipadr || 'PS5-IP')}:${ps5PayloadManagerPort}/</strong>,
+          this page can also copy it to <strong>${escapeHtml(ps5PayloadManagerRemoteDir)}/&lt;payload&gt;/</strong>
+          using PS5Upload filesystem access.
+        </div>
+
+        <div class="help-box">
+          <strong>Quick web UIs:</strong> open tools running directly on the PS5.
+          <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:12px">
+            <a class="btn secondary" id="pldmgrLink" href="${currentPS5ipadr ? `http://${escapeHtml(currentPS5ipadr)}:${ps5PayloadManagerPort}/` : '#'}" target="_blank" rel="noopener">
+              <i class="fa-solid fa-up-right-from-square"></i>
+              Open PLDMGR
+            </a>
+            <a class="btn secondary" id="retroarchLink" href="${currentPS5ipadr ? `http://${escapeHtml(currentPS5ipadr)}:6769/` : '#'}" target="_blank" rel="noopener">
+              <i class="fa-solid fa-up-right-from-square"></i>
+              Open RetroArch WebUI
+            </a>
+            <a class="btn secondary" id="ps5FileWebuiLink" href="${currentPS5ipadr ? `http://${escapeHtml(currentPS5ipadr)}:8888/` : '#'}" target="_blank" rel="noopener">
+              <i class="fa-solid fa-up-right-from-square"></i>
+              Open PS5 File WebUI
+            </a>
+          </div>
+        </div>
+
+        <label class="checkrow" for="syncPayloadManager">
+          <input id="syncPayloadManager" type="checkbox" ${ps5PayloadManagerAutoSync ? 'checked' : ''}>
+          <span>
+            Sync new uploads to Payload Manager ${ps5PayloadManagerPort} automatically.
+            You can also sync any saved payload with the <strong>Sync Manager</strong> button.
+          </span>
+        </label>
 
         <hr style="border:0;border-top:1px solid rgba(255,255,255,.12);margin:18px 0">
 
@@ -2920,6 +5909,74 @@ ${renderPs5NavBar('payloads')}
     const fileInput = document.getElementById('payloadFile');
     const hostInput = document.getElementById('ps5Host');
     const portInput = document.getElementById('ps5Port');
+    const syncPayloadManagerInput = document.getElementById('syncPayloadManager');
+    const pldmgrLink = document.getElementById('pldmgrLink');
+    const retroarchLink = document.getElementById('retroarchLink');
+    const ps5FileWebuiLink = document.getElementById('ps5FileWebuiLink');
+
+    function getCleanPs5Host() {
+      var host = hostInput && hostInput.value ? hostInput.value.trim() : '';
+
+      if (!host) {
+        return '';
+      }
+
+      var cleanHost = host;
+      var protocolIndex = cleanHost.indexOf('://');
+      if (protocolIndex >= 0) {
+        cleanHost = cleanHost.slice(protocolIndex + 3);
+      }
+
+      var slashIndex = cleanHost.indexOf('/');
+      if (slashIndex >= 0) {
+        cleanHost = cleanHost.slice(0, slashIndex);
+      }
+
+      var colonIndex = cleanHost.lastIndexOf(':');
+      if (colonIndex > 0) {
+        cleanHost = cleanHost.slice(0, colonIndex);
+      }
+
+      return cleanHost;
+    }
+
+    function updatePs5WebUiLinks() {
+      var cleanHost = getCleanPs5Host();
+
+      if (!cleanHost) {
+        if (pldmgrLink) {
+          pldmgrLink.href = '#';
+          pldmgrLink.title = 'Enter your PS5 IP first';
+        }
+
+        if (retroarchLink) {
+          retroarchLink.href = '#';
+          retroarchLink.title = 'Enter your PS5 IP first';
+        }
+
+        if (ps5FileWebuiLink) {
+          ps5FileWebuiLink.href = '#';
+          ps5FileWebuiLink.title = 'Enter your PS5 IP first';
+        }
+
+        return;
+      }
+
+      if (pldmgrLink) {
+        pldmgrLink.href = 'http://' + cleanHost + ':${ps5PayloadManagerPort}/';
+        pldmgrLink.title = pldmgrLink.href;
+      }
+
+      if (retroarchLink) {
+        retroarchLink.href = 'http://' + cleanHost + ':6769/';
+        retroarchLink.title = retroarchLink.href;
+      }
+
+      if (ps5FileWebuiLink) {
+        ps5FileWebuiLink.href = 'http://' + cleanHost + ':8888/';
+        ps5FileWebuiLink.title = ps5FileWebuiLink.href;
+      }
+    }
 
     function setStatus(message, type) {
       statusBox.className = 'status ' + (type || '');
@@ -2982,11 +6039,16 @@ ${renderPs5NavBar('payloads')}
           '<div class="payload-actions">' +
             '<a class="btn secondary" href="' + escapeText(payload.downloadUrl) + '" download><i class="fa-solid fa-download"></i> Download</a>' +
             '<button class="btn green" type="button" data-action="send"><i class="fa-solid fa-paper-plane"></i> Send</button>' +
+            '<button class="btn secondary" type="button" data-action="sync"><i class="fa-solid fa-list-check"></i> Sync Manager</button>' +
             '<button class="btn red" type="button" data-action="delete"><i class="fa-solid fa-trash"></i> Delete</button>' +
           '</div>';
 
         item.querySelector('[data-action="send"]').addEventListener('click', function () {
           sendPayload(payload);
+        });
+
+        item.querySelector('[data-action="sync"]').addEventListener('click', function () {
+          syncPayloadToManager(payload);
         });
 
         item.querySelector('[data-action="delete"]').addEventListener('click', function () {
@@ -3007,6 +6069,29 @@ ${renderPs5NavBar('payloads')}
         .catch(function (error) {
           setStatus(error.message, 'error');
         });
+    }
+
+    function syncPayloadToManager(payload) {
+      var host = hostInput.value.trim();
+
+      if (!host) {
+        setStatus('Enter your PS5 IP first.', 'error');
+        return Promise.reject(new Error('Missing PS5 IP'));
+      }
+
+      setStatus('Syncing ' + payload.name + ' to Payload Manager on ' + host + ':${ps5PayloadManagerPort}...');
+
+      return requestJson(payloadActionUrl(payload, 'sync-manager'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ host: host })
+      }).then(function (data) {
+        setStatus((data.message || 'Synced to Payload Manager.') + '\\nRemote path: ' + (data.remotePath || '') + '\\nOpen: ' + (data.managerUrl || ''), 'success');
+        return data;
+      }).catch(function (error) {
+        setStatus(error.message, 'error');
+        throw error;
+      });
     }
 
     function uploadPayload() {
@@ -3034,6 +6119,15 @@ ${renderPs5NavBar('payloads')}
         .then(function (data) {
           setStatus(data.message || 'Payload uploaded.', 'success');
           fileInput.value = '';
+
+          if (syncPayloadManagerInput && syncPayloadManagerInput.checked && data.payload) {
+            return syncPayloadToManager(data.payload).then(function () {
+              return loadPayloads();
+            }).catch(function () {
+              return loadPayloads();
+            });
+          }
+
           return loadPayloads();
         })
         .catch(function (error) {
@@ -3078,6 +6172,11 @@ ${renderPs5NavBar('payloads')}
 
     uploadBtn.addEventListener('click', uploadPayload);
     refreshBtn.addEventListener('click', loadPayloads);
+    if (hostInput) {
+      hostInput.addEventListener('input', updatePs5WebUiLinks);
+      hostInput.addEventListener('change', updatePs5WebUiLinks);
+    }
+    updatePs5WebUiLinks();
     loadPayloads();
   </script>
 </body>
