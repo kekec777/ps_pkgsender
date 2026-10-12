@@ -46,7 +46,7 @@ const ps1GamePath = path.resolve(
 const retroGamePath = path.resolve(
   process.env.RETRO_GAME_DIR || process.env.RETRO_GAMES_DIR || './Retro'
 );
-const retroRemoteRoot = String(process.env.RETRO_REMOTE_ROOT || '/data/homebrew/PPSA99169/es-de/ROMs').replace(/\/+$/, '') || '/data/homebrew/PPSA99169/es-de/ROMs';
+const retroRemoteRoot = String(process.env.RETRO_REMOTE_ROOT || '/data/homebrew/PPSA99169/ROMS').replace(/\/+$/, '') || '/data/homebrew/PPSA99169/ROMS';
 const ps2GameRemoteRoot = String(process.env.PS2_GAME_REMOTE_ROOT || '/data/PCSX2/games').replace(/\/+$/, '') || '/data/PCSX2/games';
 const pcsx2BiosRemoteDir = String(process.env.PCSX2_BIOS_REMOTE_DIR || '/data/PCSX2/bios').replace(/\/+$/, '') || '/data/PCSX2/bios';
 const ps5sx2UploadLimit = process.env.PS5SX2_UPLOAD_LIMIT || process.env.PCSX2_UPLOAD_LIMIT || '2gb';
@@ -61,7 +61,7 @@ const ps2GameExtensions = (process.env.PS2_GAME_EXTENSIONS || '.iso,.chd,.cso,.b
   .split(',')
   .map((item) => item.trim().toLowerCase())
   .filter(Boolean);
-const ps1GameExtensions = (process.env.PS1_GAME_EXTENSIONS || '.cue,.chd,.pbp,.iso,.bin,.img,.mdf,.ccd,.m3u,.toc,.ecm')
+const ps1GameExtensions = (process.env.PS1_GAME_EXTENSIONS || '.cue,.chd,.pbp,.iso,.bin,.img,.mdf,.ccd,.m3u,.toc,.ecm,.zip,.7z')
   .split(',')
   .map((item) => item.trim().toLowerCase())
   .filter(Boolean);
@@ -287,7 +287,13 @@ function toPublicImageUrl(folder, filename, fallback = 'folder.png') {
 }
 
 function getPkgDisplayName(pkg) {
-  const raw = String((pkg && (pkg.displayName || pkg.shortDisplayName || pkg.fileName || pkg.filename || pkg.name)) || 'Unknown.pkg');
+  const raw = String((pkg && (pkg.displayName || pkg.shortDisplayName || pkg.fileName || pkg.filename || pkg.name)) || 'Unknown');
+  const platform = String((pkg && (pkg.platform || pkg.platformLabel)) || '').toLowerCase();
+
+  if (['ps2', 'switch', 'retro'].includes(platform)) {
+    return raw;
+  }
+
   return raw.toLowerCase().endsWith('.pkg') ? raw : `${raw}.pkg`;
 }
 
@@ -2068,6 +2074,14 @@ function getRetroSystemRemoteFolder(systemFolder) {
   return key.replace(/[^a-z0-9]+/g, '') || 'roms';
 }
 
+function safeRetroRemoteFolderName(value) {
+  return String(value || 'Retro')
+    .replace(/[\\/\x00-\x1F]/g, '_')
+    .replace(/^[.]+$/, 'Retro')
+    .trim()
+    .slice(0, 120) || 'Retro';
+}
+
 function getPs1GamesFromRoot(rootPath, prefixRoot = false) {
   const filelist = {};
   const basePath = path.resolve(rootPath);
@@ -2159,7 +2173,7 @@ function getRetroGamesFromRoot(rootPath, prefixRoot = false) {
       const relativePath = path.relative(basePath, filepath);
       const relativeParts = relativePath.split(path.sep).filter(Boolean);
       const sourceSystem = relativeParts.length > 1 ? relativeParts[0] : 'Retro';
-      const retroSystem = getRetroSystemRemoteFolder(sourceSystem);
+      const retroSystem = safeRetroRemoteFolderName(sourceSystem);
       const relativeDir = path.dirname(relativePath);
       const name = path.basename(filepath);
       const fileBaseName = path.parse(name).name;
@@ -2563,11 +2577,10 @@ function getRetroRemotePath(filepath) {
 
   const relative = toPosixRelativePath(path.relative(retroGamePath, filepath));
   const parts = relative.split('/').filter(Boolean);
-  const sourceSystem = parts.length > 1 ? parts.shift() : 'Retro';
-  const retroSystem = getRetroSystemRemoteFolder(sourceSystem);
+  const sourceSystem = parts.length > 1 ? safeRetroRemoteFolderName(parts.shift()) : 'Retro';
   const rest = parts.length ? parts.join('/') : path.basename(filepath);
 
-  return `${retroRemoteRoot}/${retroSystem}/${rest}`.replace(/\/+/g, '/');
+  return `${retroRemoteRoot}/${sourceSystem}/${rest}`.replace(/\/+/g, '/');
 }
 
 async function ps5UploadUploadRetroGame(filepath, host, onProgress = null) {
@@ -4107,7 +4120,6 @@ ${navButton('/ps5/homebrew', 'fa-folder-tree', 'Homebrew apps', 'homebrew')}
 ${navButton('/ps5/nintendoswitch', 'fa-gamepad', 'Nintendo Switch', 'switch')}
 ${navButton('/ps5/ps5sx2', 'fa-compact-disc', 'PS5SX2', 'ps5sx2')}
 ${navButton('/ps5/links', 'fa-link', 'PS5 links', 'links')}
-${navButton('/ps5upload', 'fa-upload', 'PS5Upload', 'ps5upload')}
 ${navButton('/ps5/tools', 'fa-wrench', 'PS5 tools', 'tools')}
       </div>
     </section>`;
@@ -5431,7 +5443,7 @@ function renderPs5LinksPage() {
     .field { display: grid; gap: 7px; margin-bottom: 18px; }
     label { color: var(--muted); font-size: .85rem; font-weight: 800; }
     input[type="text"] { width: 100%; color: var(--text); background: rgba(2, 6, 23, .6); border: 1px solid var(--border); border-radius: 14px; padding: 12px 13px; outline: none; }
-    .links-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; margin-top: 18px; }
+    .links-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; margin-top: 18px; }
     .link-card { display: grid; gap: 10px; min-height: 190px; padding: 18px; color: var(--text); text-decoration: none; border: 1px solid var(--border); border-radius: 22px; background: var(--panel-2); transition: transform .18s ease, border-color .18s ease, background .18s ease; }
     .link-card:hover { transform: translateY(-3px); border-color: rgba(125,211,252,.42); background: rgba(30,41,59,.86); color: var(--text); }
     .link-icon { width: 46px; height: 46px; display: grid; place-items: center; border-radius: 16px; background: rgba(59,130,246,.22); color: #bfdbfe; font-size: 1.25rem; }
@@ -5461,6 +5473,7 @@ function renderPs5LinksPage() {
         <a class="link-card" id="pldmgrLink" href="#" target="_blank" rel="noopener"><span class="link-icon"><i class="fa-solid fa-list-check"></i></span><strong>PLDMGR</strong><small>Payload Manager web UI on port 8084.</small></a>
         <a class="link-card" id="retroarchLink" href="#" target="_blank" rel="noopener"><span class="link-icon"><i class="fa-solid fa-gamepad"></i></span><strong>RetroArch WebUI</strong><small>RetroArch remote/web interface on port 6769.</small></a>
         <a class="link-card" id="ps5FileWebuiLink" href="#" target="_blank" rel="noopener"><span class="link-icon"><i class="fa-solid fa-folder-open"></i></span><strong>PS5 File WebUI</strong><small>PS5 file web UI manager on port 8888.</small></a>
+        <a class="link-card" href="/ps5upload"><span class="link-icon"><i class="fa-solid fa-upload"></i></span><strong>PS5Upload</strong><small>Integrated PS5Upload web UI through PKG Sender.</small></a>
       </div>
 
       <div class="status" id="statusBox">Enter PS5 IP and open a link.</div>

@@ -763,11 +763,11 @@
         </a>
         <a class="btn btn-outline-light btn-sm" href="{{ps5sx2Url}}">
           <i class="fa-solid fa-compact-disc"></i>
-          PS5SX2 BIOS
+          PS5SX2
         </a>
-        <a class="btn btn-outline-light btn-sm" href="{{ps5UploadUrl}}">
-          <i class="fa-solid fa-upload"></i>
-          PS5Upload
+        <a class="btn btn-outline-light btn-sm" href="{{ps5LinksUrl}}">
+          <i class="fa-solid fa-link"></i>
+          PS5 links
         </a>
         <a class="btn btn-outline-light btn-sm" href="{{ps5ToolsUrl}}">
           <i class="fa-solid fa-wrench"></i>
@@ -814,7 +814,7 @@
         {{#showRetroGameCount}}
         <div class="package-stat-line">
           <span>{{retroGameCount}}</span>
-          <small>Retro games</small>
+          <small>Retro / PS1 games</small>
         </div>
         {{/showRetroGameCount}}
       </div>
@@ -950,7 +950,7 @@
             </label>
             <label class="platform-filter-toggle">
               <input type="checkbox" class="platform-filter-input" value="retro" checked>
-              <span>Retro games</span>
+              <span>Retro / PS1 games</span>
             </label>
           </div>
           {{/isPs5}}
@@ -984,10 +984,6 @@
           <a class="btn btn-outline-light btn-sm" href="{{ps5LinksUrl}}">
             <i class="fa-solid fa-link"></i>
             PS5 links
-          </a>
-          <a class="btn btn-outline-light btn-sm" href="{{ps5UploadUrl}}">
-            <i class="fa-solid fa-upload"></i>
-            PS5Upload
           </a>
           {{/isPs5}}
           <button class="btn btn-outline-light btn-sm" id="expandAll" type="button">Expand all</button>

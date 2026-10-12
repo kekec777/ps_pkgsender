@@ -107,7 +107,7 @@ This project is designed for a trusted LAN setup. It is not intended to be expos
 - PS1 games upload to:
 
 ```text
-/data/homebrew/PPSA99169/es-de/ROMs/psx
+/data/homebrew/PPSA99169/ROMS/psx
 ```
 
 - Retro games use the first folder under `/pkg_sender/Retro` as the system name. Example:
@@ -119,7 +119,7 @@ This project is designed for a trusted LAN setup. It is not intended to be expos
 uploads to:
 
 ```text
-/data/homebrew/PPSA99169/es-de/ROMs/snes/Game.sfc
+/data/homebrew/PPSA99169/ROMS/SNES/Game.sfc
 ```
 
 - Common folder aliases are included, such as `SNES -> snes`, `NES -> nes`, `N64 -> n64`, `Genesis -> megadrive`, `PS1 -> psx`, and `MAME -> mame`.
@@ -265,8 +265,8 @@ PS2_GAME_EXTENSIONS=.iso,.chd,.cso,.bin,.img,.mdf,.nrg,.gz
 # RetroArch / ES-DE ROMs
 PS1_GAME_DIR=/pkg_sender/PS1Games
 RETRO_GAME_DIR=/pkg_sender/Retro
-RETRO_REMOTE_ROOT=/data/homebrew/PPSA99169/es-de/ROMs
-PS1_GAME_EXTENSIONS=.cue,.chd,.pbp,.iso,.bin,.img,.mdf,.ccd,.m3u,.toc,.ecm
+RETRO_REMOTE_ROOT=/data/homebrew/PPSA99169/ROMS
+PS1_GAME_EXTENSIONS=.cue,.chd,.pbp,.iso,.bin,.img,.mdf,.ccd,.m3u,.toc,.ecm,.zip,.7z
 RETRO_GAME_EXTENSIONS=.zip,.7z,.nes,.fds,.sfc,.smc,.fig,.gb,.gbc,.gba,.n64,.z64,.v64,.md,.smd,.gen,.sms,.gg,.32x,.pce,.sgx,.ws,.wsc,.ngp,.ngc,.a26,.a52,.a78,.lnx,.j64,.rom,.col,.int,.vec,.dsk,.tap,.tzx,.z80,.uae,.adf,.ipf,.lha,.cue,.chd,.iso,.cso,.pbp,.bin,.img,.m3u,.nds,.3ds,.cia,.dol,.gcm,.rvz,.wad,.wbfs,.cdi,.gdi,.elf,.doom,.p8,.tic
 
 PCSX2_BIOS_REMOTE_DIR=/data/PCSX2/bios
@@ -461,12 +461,12 @@ git push -u origin main
 Create a release:
 
 ```bash
-TAG=v2.6.0
+TAG=v2.6.1
 
 mkdir -p dist
 
 cat > RELEASE_NOTES.md <<'EOF_NOTES'
-# PS PKG Sender v2.6.0
+# PS PKG Sender v2.6.1
 
 ## Added
 - Direct PS5Upload install support for PS5 packages
@@ -513,7 +513,16 @@ This project does not provide games, BIOS files, firmware, encryption keys, lice
 Use this tool only with homebrew and files you legally own and are legally allowed to use.
 
 
-## Notes for v2.6.0
+## Notes for v2.6.1
 
 - Added PS5 Links page to the shared PS5 navigation so it is available from PS5 subpages.
 - Added Retro games on the PS5 library page and RetroArch/ES-DE upload routing.
+
+
+## Retro folder routing
+
+The top-level folder under `/pkg_sender/Retro` is preserved when uploading. Example: `/pkg_sender/Retro/GEN/Sonic The Hedgehog.zip` uploads to `/data/homebrew/PPSA99169/ROMS/GEN/Sonic The Hedgehog.zip`.
+
+PS1 files from `/pkg_sender/PS1Games` upload to `/data/homebrew/PPSA99169/ROMS/psx`.
+
+PS5Upload is available from the PS5 Links page instead of the main PS5 subpage navigation.
