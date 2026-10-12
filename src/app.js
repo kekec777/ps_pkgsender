@@ -6446,6 +6446,8 @@ function renderConsoleSelectPage() {
         <span style="color:rgba(255,255,255,.24)">•</span>
         <a class="small-link" href="/ps5/payloads">PS5 Payload / ELF manager</a>
         <span style="color:rgba(255,255,255,.24)">•</span>
+        <a class="small-link" href="/ps5/links">PS5 links</a>
+        <span style="color:rgba(255,255,255,.24)">•</span>
         <a class="small-link" href="/ps5/homebrew">PS5 Homebrew apps</a>
       </div>
     </section>

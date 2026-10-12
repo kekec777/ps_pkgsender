@@ -48,12 +48,9 @@ This project is designed for a trusted LAN setup. It is not intended to be expos
 - Send payload files to the PS5 ELF loader port, usually `9021`.
 - Helper text explains that `elfldr / ELF loader` must be loaded before sending payloads.
 - Optional Payload Manager 8084 integration.
-<<<<<<< Updated upstream
-=======
 - Direct PLDMGR link from the Payload / ELF manager page to `http://<PS5_IP>:8084/`.
 - Direct RetroArch WebUI link from the Payload / ELF manager page to `http://<PS5_IP>:6769/`.
 - Direct PS5 File WebUI Manager link from the Payload / ELF manager page to `http://<PS5_IP>:8888/`.
->>>>>>> Stashed changes
 - Payloads can be synced into the PS5 Payload Manager storage path.
 
 ### Homebrew app manager
@@ -81,24 +78,15 @@ This project is designed for a trusted LAN setup. It is not intended to be expos
 /data/PCSX2/games
 ```
 
-<<<<<<< Updated upstream
-### PS5SX2 BIOS manager
-
-- Dedicated page for uploading BIOS files to the PS5.
-- Default target:
-=======
 ### PS5SX2 manager
 
 - Dedicated page for PS5SX2 / PCSX2 management.
 - Upload your own legally dumped BIOS files to:
->>>>>>> Stashed changes
 
 ```text
 /data/PCSX2/bios
 ```
 
-<<<<<<< Updated upstream
-=======
 - List PS2 games stored on the PS5 in:
 
 ```text
@@ -106,15 +94,12 @@ This project is designed for a trusted LAN setup. It is not intended to be expos
 ```
 
 - Delete PS2 games from the PS5SX2 games folder through PS5Upload.
->>>>>>> Stashed changes
 - Supported BIOS extensions by default:
 
 ```text
 .bin, .rom, .erom, .nvm, .mec, .zip, .txt
 ```
 
-<<<<<<< Updated upstream
-=======
 ### RetroArch / Retro games support
 
 - PS1 games can be mapped from `/pkg_sender/PS1Games`.
@@ -139,7 +124,6 @@ uploads to:
 
 - Common folder aliases are included, such as `SNES -> snes`, `NES -> nes`, `N64 -> n64`, `Genesis -> megadrive`, `PS1 -> psx`, and `MAME -> mame`.
 
->>>>>>> Stashed changes
 ### Nintendo Switch / ProsperoEden support
 
 - Nintendo Switch games can be shown on the PS5 page.
@@ -166,8 +150,6 @@ Dedicated page for uploading your own legally dumped files to:
 /data/prosperoeden/mods
 ```
 
-<<<<<<< Updated upstream
-=======
 The page can also list ROMs stored in:
 
 ```text
@@ -176,7 +158,6 @@ The page can also list ROMs stored in:
 
 and delete ROMs from that folder through PS5Upload.
 
->>>>>>> Stashed changes
 This project does not include or provide console keys, firmware, BIOS files, ROMs, ISOs, packages, or commercial games.
 
 ---
@@ -190,16 +171,10 @@ This project does not include or provide console keys, firmware, BIOS files, ROM
 | `/ps5` | PS5 library with PS4, PS5, PS2, and Switch sections |
 | `/ps5/payloads` | Payload / ELF manager |
 | `/ps5/homebrew` | PS5 homebrew ZIP manager |
-<<<<<<< Updated upstream
-| `/ps5/ps5sx2` | PS5SX2 BIOS manager |
-| `/ps5/nintendoswitch` | ProsperoEden keys, firmware, updates, and mods manager |
-| `/ps5/tools` | Relapse / etaHEN tools |
-=======
 | `/ps5/ps5sx2` | PS5SX2 manager: BIOS upload plus remote PS2 game list/delete |
 | `/ps5/nintendoswitch` | ProsperoEden keys, firmware, updates, mods, and remote ROM list/delete |
 | `/ps5/tools` | Relapse / etaHEN tools |
 | `/ps5/links` | PS5 quick links for PLDMGR, RetroArch WebUI, and PS5 File WebUI |
->>>>>>> Stashed changes
 | `/ps5upload` | Integrated PS5Upload Web UI redirect |
 
 ---
@@ -213,11 +188,8 @@ volumes:
   - /path/to/Playstation/PS4/Games/:/pkg_sender/PS4Games
   - /path/to/Playstation/PS5/Games/:/pkg_sender/PS5Games
   - /path/to/Playstation/PS2/Games/:/pkg_sender/PS2Games
-<<<<<<< Updated upstream
-=======
   - /path/to/Playstation/PS1/Games/:/pkg_sender/PS1Games
   - /path/to/Playstation/ROMS/:/pkg_sender/Retro
->>>>>>> Stashed changes
   - /path/to/Nintendo/Switch/Games/:/pkg_sender/SwitchGames
   - /path/to/pkgsender/src:/pkg_sender/src
 ```
@@ -289,8 +261,6 @@ PS5_FTP_PORT=1337
 PS2_GAME_DIR=/pkg_sender/PS2Games
 PS2_GAME_REMOTE_ROOT=/data/PCSX2/games
 PS2_GAME_EXTENSIONS=.iso,.chd,.cso,.bin,.img,.mdf,.nrg,.gz
-<<<<<<< Updated upstream
-=======
 
 # RetroArch / ES-DE ROMs
 PS1_GAME_DIR=/pkg_sender/PS1Games
@@ -299,7 +269,6 @@ RETRO_REMOTE_ROOT=/data/homebrew/PPSA99169/es-de/ROMs
 PS1_GAME_EXTENSIONS=.cue,.chd,.pbp,.iso,.bin,.img,.mdf,.ccd,.m3u,.toc,.ecm
 RETRO_GAME_EXTENSIONS=.zip,.7z,.nes,.fds,.sfc,.smc,.fig,.gb,.gbc,.gba,.n64,.z64,.v64,.md,.smd,.gen,.sms,.gg,.32x,.pce,.sgx,.ws,.wsc,.ngp,.ngc,.a26,.a52,.a78,.lnx,.j64,.rom,.col,.int,.vec,.dsk,.tap,.tzx,.z80,.uae,.adf,.ipf,.lha,.cue,.chd,.iso,.cso,.pbp,.bin,.img,.m3u,.nds,.3ds,.cia,.dol,.gcm,.rvz,.wad,.wbfs,.cdi,.gdi,.elf,.doom,.p8,.tic
 
->>>>>>> Stashed changes
 PCSX2_BIOS_REMOTE_DIR=/data/PCSX2/bios
 PS5SX2_UPLOAD_LIMIT=2gb
 PCSX2_BIOS_EXTENSIONS=.bin,.rom,.erom,.nvm,.mec,.zip,.txt
@@ -376,8 +345,6 @@ The Payload / ELF page sends files to `elfldr`, so `elfldr` must already be runn
 
 ---
 
-<<<<<<< Updated upstream
-=======
 ## Remote list/delete APIs
 
 These endpoints use the integrated PS5Upload API and require ps5upload to be running on the PS5.
@@ -402,7 +369,6 @@ The app refuses to delete the root folder and rejects paths outside the configur
 
 ---
 
->>>>>>> Stashed changes
 ## Common troubleshooting
 
 ### PS5 package install opens PS5Upload instead of installing
@@ -488,44 +454,24 @@ cd "$PKGSENDER_DIR"
 
 git status --short
 git add .gitignore Dockerfile docker-entrypoint.sh package.json package-lock.json README.md src
-<<<<<<< Updated upstream
-git commit -m "Add PS5Upload, PS2, Switch and emulator managers"
-=======
 git commit -m "Add PS5Upload, emulator managers and remote delete tools"
->>>>>>> Stashed changes
 git push -u origin main
 ```
 
 Create a release:
 
 ```bash
-<<<<<<< Updated upstream
-TAG=v2.4.0
-=======
-TAG=v2.5.0
->>>>>>> Stashed changes
+TAG=v2.6.0
 
 mkdir -p dist
 
 cat > RELEASE_NOTES.md <<'EOF_NOTES'
-<<<<<<< Updated upstream
-# PS PKG Sender v2.4.0
-=======
-# PS PKG Sender v2.5.0
->>>>>>> Stashed changes
+# PS PKG Sender v2.6.0
 
 ## Added
 - Direct PS5Upload install support for PS5 packages
 - PS5Upload-based Homebrew deploy instead of FTP
 - Payload Manager 8084 integration
-<<<<<<< Updated upstream
-- PS2 games section on PS5 page
-- Upload PS2 games to /data/PCSX2/games
-- Nintendo Switch / ProsperoEden games section
-- ProsperoEden manager page for keys, firmware, updates, and mods
-- PS5SX2 BIOS manager page
-- Upload BIOS files to /data/PCSX2/bios
-=======
 - PLDMGR quick link from the Payload / ELF manager page
 - RetroArch WebUI quick link from the Payload / ELF manager page
 - PS5 File WebUI Manager quick link from the Payload / ELF manager page
@@ -540,16 +486,12 @@ cat > RELEASE_NOTES.md <<'EOF_NOTES'
 - PS5SX2 manager page
 - Upload BIOS files to /data/PCSX2/bios
 - Remote PS5SX2 game list and delete from /data/PCSX2/games
->>>>>>> Stashed changes
 
 ## Fixed
 - PS5Upload install source format now uses host_file
 - Payload sync uses transfer/file instead of fs/write-bytes
 - Homebrew deploy uses transfer/dir instead of unsupported reconcile mode
-<<<<<<< Updated upstream
-=======
 - Homebrew page browser script no longer breaks on inline template rendering
->>>>>>> Stashed changes
 EOF_NOTES
 
 git archive --format=zip --output "dist/ps_pkgsender-${TAG}.zip" HEAD
@@ -569,3 +511,9 @@ gh release create "$TAG" \
 This project does not provide games, BIOS files, firmware, encryption keys, licenses, or copyrighted files.
 
 Use this tool only with homebrew and files you legally own and are legally allowed to use.
+
+
+## Notes for v2.6.0
+
+- Added PS5 Links page to the shared PS5 navigation so it is available from PS5 subpages.
+- Added Retro games on the PS5 library page and RetroArch/ES-DE upload routing.
