@@ -464,6 +464,7 @@ function getConsoleViewData(consoleType = 'ps4') {
     ps5HomebrewUrl: '/ps5/homebrew',
     nintendoSwitchUrl: '/ps5/nintendoswitch',
     ps5sx2Url: '/ps5/ps5sx2',
+    ps5RetroUrl: '/ps5/retro',
     ps5LinksUrl: '/ps5/links',
     ps5UploadUrl: '/ps5upload'
   };
@@ -844,6 +845,10 @@ app.get('/ps5/switch', (req, res) => {
 
 app.get('/ps5/ps5sx2', (req, res) => {
   res.type('html').send(renderPs5sx2Page());
+});
+
+app.get('/ps5/retro', (req, res) => {
+  res.type('html').send(renderRetroManagerPage());
 });
 
 app.get('/ps5/pcsx2', (req, res) => {
@@ -1808,6 +1813,7 @@ function getPs2GamesFromRoot(rootPath, prefixRoot = false) {
       const name = path.basename(filepath);
       const fileBaseName = path.parse(name).name;
       const dirname = relativeDir === '.' ? fileBaseName : relativeDir;
+
       const rawRoot = relativeDir === '.' ? fileBaseName : (dirname.split(path.sep)[0] || fileBaseName || 'PS2');
       const root = prefixRoot ? `${platformLabel} / ${rawRoot}` : rawRoot;
 
@@ -2112,8 +2118,11 @@ function getPs1GamesFromRoot(rootPath, prefixRoot = false) {
       const name = path.basename(filepath);
       const fileBaseName = path.parse(name).name;
       const dirname = relativeDir === '.' ? fileBaseName : relativeDir;
-      const rawRoot = relativeDir === '.' ? fileBaseName : (dirname.split(path.sep)[0] || fileBaseName || 'PS1');
-      const root = prefixRoot ? `Retro / PS1 / ${rawRoot}` : rawRoot;
+
+      // PS1 games often live in one folder per game because multi-file discs use .cue/.bin.
+      // Keep the file/folder path in the row, but collect every PS1 item under one accordion folder.
+      const rawRoot = 'PS1';
+      const root = prefixRoot ? 'Retro / PS1' : rawRoot;
 
       if (!filelist[root]) filelist[root] = [];
 
@@ -2555,6 +2564,9 @@ function getPs2RemotePath(filepath) {
   const relative = toPosixRelativePath(path.relative(ps2GamePath, filepath));
   return `${ps2GameRemoteRoot}/${relative}`.replace(/\/+/g, '/');
 }
+
+
+
 
 
 function getSwitchRemotePath(filepath) {
@@ -3766,6 +3778,52 @@ async function deleteProsperoEdenRemoteRom(remotePath, options = {}) {
   };
 }
 
+
+function getRetroRemoteAllowedExtensions() {
+  return Array.from(new Set([
+    ...ps1GameExtensions,
+    ...retroGameExtensions
+  ]));
+}
+
+async function getRetroRemoteGames(options = {}) {
+  const addr = getPs5RemoteHost(options);
+  const files = await ps5UploadListRemoteFiles(addr, retroRemoteRoot, getRetroRemoteAllowedExtensions(), 6);
+
+  return {
+    ok: true,
+    ps5_addr: addr,
+    remoteRoot: retroRemoteRoot,
+    games: files.map((file) => {
+      const relative = file.path.startsWith(`${retroRemoteRoot}/`)
+        ? file.path.slice(retroRemoteRoot.length + 1)
+        : file.name;
+      const system = relative.split('/').filter(Boolean)[0] || 'ROMs';
+
+      return {
+        ...file,
+        relative,
+        system
+      };
+    })
+  };
+}
+
+async function deleteRetroRemoteGame(remotePath, options = {}) {
+  const addr = getPs5RemoteHost(options);
+  const target = ensureRemotePathInsideRoot(retroRemoteRoot, remotePath);
+  const result = await ps5UploadDeletePath(addr, target, ps5FtpTimeoutMs);
+
+  return {
+    ok: true,
+    message: `Deleted ${target} from Retro ROMs`,
+    ps5_addr: addr,
+    remotePath: target,
+    opId: result.opId,
+    opStatus: result.opStatus
+  };
+}
+
 async function getPs5sx2RemoteGames(options = {}) {
   const addr = getPs5RemoteHost(options);
   const files = await ps5UploadListRemoteFiles(addr, ps2GameRemoteRoot, ps2GameExtensions, 5);
@@ -4072,6 +4130,8 @@ function renderPs5NavBar(active = '') {
       ? 'Nintendo Switch / ProsperoEden'
       : active === 'ps5sx2'
       ? 'PS5SX2 / PCSX2 manager'
+      : active === 'retro'
+      ? 'Retro manager'
       : active === 'links'
       ? 'PS5 links'
       : active === 'ps5upload'
@@ -4088,6 +4148,8 @@ function renderPs5NavBar(active = '') {
         ? 'Upload keys, firmware, updates and mods to /data/prosperoeden'
       : active === 'ps5sx2'
         ? 'Upload BIOS files to /data/PCSX2/bios'
+      : active === 'retro'
+        ? 'Manage installed RetroArch / ES-DE ROMs'
       : active === 'links'
         ? 'Open web UIs running on the PS5'
       : active === 'ps5upload'
@@ -4119,6 +4181,7 @@ ${navButton('/ps5/payloads', 'fa-microchip', 'Payloads / ELF', 'payloads')}
 ${navButton('/ps5/homebrew', 'fa-folder-tree', 'Homebrew apps', 'homebrew')}
 ${navButton('/ps5/nintendoswitch', 'fa-gamepad', 'Nintendo Switch', 'switch')}
 ${navButton('/ps5/ps5sx2', 'fa-compact-disc', 'PS5SX2', 'ps5sx2')}
+${navButton('/ps5/retro', 'fa-dice-d20', 'Retro', 'retro')}
 ${navButton('/ps5/links', 'fa-link', 'PS5 links', 'links')}
 ${navButton('/ps5/tools', 'fa-wrench', 'PS5 tools', 'tools')}
       </div>
@@ -5545,6 +5608,215 @@ function renderPs5LinksPage() {
 
       updateLinks();
     }());
+  </script>
+</body>
+</html>`;
+}
+
+
+
+function renderRetroManagerPage() {
+  const escapedRoot = escapeHtml(retroRemoteRoot);
+
+  return `<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Retro Manager - PKG Sender</title>
+  <link rel="stylesheet" href="/css/fontawesome.min.css">
+  <link rel="stylesheet" href="/css/solid.min.css">
+  <style>
+    ${renderPs5StandaloneNavCss()}
+
+    :root {
+      --bg: #07111f;
+      --panel: rgba(15, 23, 42, 0.86);
+      --panel-2: rgba(30, 41, 59, 0.64);
+      --border: rgba(255,255,255,0.14);
+      --text: #eef3ff;
+      --muted: #a9b8d4;
+      --green: #22c55e;
+      --red: #ef4444;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: Inter, Segoe UI, Roboto, Arial, sans-serif;
+      color: var(--text);
+      background:
+        radial-gradient(circle at top left, rgba(139,92,246,.30), transparent 34rem),
+        radial-gradient(circle at bottom right, rgba(6,182,212,.18), transparent 38rem),
+        var(--bg);
+    }
+
+    .page { width: min(1360px, calc(100vw - 48px)); margin: 0 auto; padding: 18px 0 60px; }
+    .hero, .panel { border: 1px solid var(--border); background: var(--panel); border-radius: 26px; box-shadow: 0 24px 80px rgba(0,0,0,.32); backdrop-filter: blur(18px); }
+    .hero { padding: 28px; margin-bottom: 18px; }
+    .eyebrow { margin: 0 0 8px; color: #93c5fd; text-transform: uppercase; letter-spacing: .12em; font-size: .78rem; font-weight: 1000; }
+    h1, h2, h3, p { margin-top: 0; }
+    h1 { margin-bottom: 10px; font-size: clamp(2rem, 5vw, 4rem); line-height: .95; letter-spacing: -.07em; }
+    .muted { color: var(--muted); line-height: 1.55; }
+    .panel { padding: 20px; min-width: 0; }
+    .field { display: grid; gap: 7px; margin-bottom: 14px; }
+    label { color: var(--muted); font-size: .85rem; font-weight: 800; }
+    input[type="text"] { width: 100%; color: var(--text); background: rgba(2, 6, 23, .6); border: 1px solid var(--border); border-radius: 14px; padding: 12px 13px; outline: none; }
+    .btn { appearance: none; border: 0; cursor: pointer; border-radius: 14px; padding: 11px 14px; color: #fff; background: linear-gradient(135deg, #2563eb, #0ea5e9); font-weight: 950; display: inline-flex; align-items: center; justify-content: center; gap: 8px; text-decoration: none; white-space: nowrap; }
+    .btn.red { background: linear-gradient(135deg, #dc2626, #ef4444); }
+    .btn.secondary { background: rgba(255,255,255,.10); border: 1px solid var(--border); }
+    .status { min-height: 44px; margin-top: 14px; padding: 12px 14px; border-radius: 16px; border: 1px solid var(--border); background: rgba(255,255,255,.06); color: var(--muted); white-space: pre-wrap; overflow-wrap: anywhere; }
+    .status.success { color: #bbf7d0; border-color: rgba(34,197,94,.35); }
+    .status.error { color: #fecaca; border-color: rgba(239,68,68,.40); }
+    .remote-list { display: grid; gap: 10px; margin-top: 14px; }
+    .remote-item { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 10px; padding: 12px; border: 1px solid var(--border); background: var(--panel-2); border-radius: 14px; color: var(--muted); overflow-wrap: anywhere; }
+    .remote-item strong { color: var(--text); overflow-wrap: anywhere; }
+    .system-pill { display: inline-flex; width: fit-content; padding: 5px 9px; margin-bottom: 6px; border-radius: 999px; color: #fff; background: linear-gradient(135deg, #8b5cf6, #06b6d4); font-weight: 950; font-size: .74rem; }
+    .remote-actions { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+    .empty { padding: 22px; text-align: center; color: var(--muted); border: 1px dashed var(--border); border-radius: 18px; }
+    @media (max-width: 900px) { .remote-item { grid-template-columns: 1fr; } .remote-actions { justify-content: flex-start; } }
+  </style>
+</head>
+<body>
+  <main class="page">
+    ${renderPs5NavBar('retro')}
+
+    <section class="hero">
+      <p class="eyebrow">RetroArch / ES-DE</p>
+      <h1>Retro manager</h1>
+      <p class="muted">
+        View and delete installed Retro / PS1 games from <strong>${escapedRoot}</strong>.
+        PS2 games stay under the PS5SX2 manager and upload to <strong>/data/PCSX2/games</strong>.
+      </p>
+    </section>
+
+    <section class="panel">
+      <div class="field">
+        <label for="ps5Host">PS5 IP / host</label>
+        <input id="ps5Host" type="text" value="${escapeHtml(currentPS5ipadr || '')}" placeholder="192.168.1.110">
+      </div>
+
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">
+        <div>
+          <p class="eyebrow">Remote games</p>
+          <h2 style="margin:0">Retro / PS1 games</h2>
+          <p class="muted" style="margin:6px 0 0">${escapedRoot}</p>
+        </div>
+        <button class="btn secondary" id="refreshGamesBtn" type="button">
+          <i class="fa-solid fa-rotate"></i>
+          Refresh games
+        </button>
+      </div>
+
+      <div class="status" id="statusBox">Ready.</div>
+      <div class="remote-list" id="gameList">
+        <div class="empty">Loading retro game list...</div>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    const statusBox = document.getElementById('statusBox');
+    const hostInput = document.getElementById('ps5Host');
+    const gameList = document.getElementById('gameList');
+    const refreshGamesBtn = document.getElementById('refreshGamesBtn');
+
+    function setStatus(message, type) {
+      statusBox.className = 'status ' + (type || '');
+      statusBox.textContent = message || '';
+    }
+
+    function escapeText(value) {
+      return String(value || '').replace(/[&<>"']/g, function (char) {
+        return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char];
+      });
+    }
+
+    function requestJson(url, options) {
+      options = options || {};
+      options.headers = options.headers || {};
+      options.headers.Accept = 'application/json';
+
+      return fetch(url, options).then(function (response) {
+        return response.text().then(function (text) {
+          var data = {};
+          try { data = text ? JSON.parse(text) : {}; }
+          catch (error) { data = { message: text }; }
+          if (!response.ok) throw new Error(data.message || data.error || response.statusText);
+          return data;
+        });
+      });
+    }
+
+    function loadGames() {
+      var host = hostInput.value.trim();
+      var url = '/api/ps5/retro/games';
+      if (host) url += '?host=' + encodeURIComponent(host);
+
+      gameList.innerHTML = '<div class="empty">Loading retro game list...</div>';
+      setStatus('Loading retro game list...');
+
+      return requestJson(url).then(function (data) {
+        renderGames(data.games || []);
+        setStatus('Loaded ' + ((data.games || []).length) + ' retro game file(s).', 'success');
+      }).catch(function (error) {
+        gameList.innerHTML = '<div class="empty">' + escapeText(error.message) + '</div>';
+        setStatus(error.message, 'error');
+      });
+    }
+
+    function renderGames(games) {
+      gameList.innerHTML = '';
+
+      if (!games.length) {
+        gameList.innerHTML = '<div class="empty">No retro games found.</div>';
+        return;
+      }
+
+      games.forEach(function (game) {
+        var item = document.createElement('div');
+        item.className = 'remote-item';
+        item.innerHTML =
+          '<div>' +
+            '<span class="system-pill">' + escapeText(game.system || 'ROMs') + '</span>' +
+            '<strong>' + escapeText(game.name) + '</strong>' +
+            '<div class="muted">' + escapeText(game.sizeLabel || '') + ' · ' + escapeText(game.path || '') + '</div>' +
+          '</div>' +
+          '<div class="remote-actions">' +
+            '<button class="btn red" type="button" data-action="delete-game"><i class="fa-solid fa-trash"></i> Delete</button>' +
+          '</div>';
+
+        item.querySelector('[data-action="delete-game"]').addEventListener('click', function () {
+          deleteGame(game);
+        });
+
+        gameList.appendChild(item);
+      });
+    }
+
+    function deleteGame(game) {
+      var host = hostInput.value.trim();
+
+      if (!confirm('Delete "' + game.path + '" from Retro ROMs?')) return;
+
+      setStatus('Deleting ' + game.name + ' from Retro ROMs...');
+
+      requestJson('/api/ps5/retro/games/delete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ host: host, path: game.path })
+      }).then(function (data) {
+        setStatus(data.message || 'Retro game deleted.', 'success');
+        return loadGames();
+      }).catch(function (error) {
+        setStatus(error.message, 'error');
+      });
+    }
+
+    refreshGamesBtn.addEventListener('click', loadGames);
+    loadGames();
   </script>
 </body>
 </html>`;

@@ -453,6 +453,24 @@
     .platform-filter-toggle span {
       line-height: 1;
     }
+
+    .pkg-actions {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+      align-items: center;
+    }
+
+    .pkg-actions .install-form {
+      margin: 0;
+    }
+
+    @media (max-width: 860px) {
+      .pkg-actions {
+        justify-content: flex-start;
+      }
+    }
   </style>
 
 
@@ -765,6 +783,10 @@
           <i class="fa-solid fa-compact-disc"></i>
           PS5SX2
         </a>
+        <a class="btn btn-outline-light btn-sm" href="{{ps5RetroUrl}}">
+          <i class="fa-solid fa-dice-d20"></i>
+          Retro
+        </a>
         <a class="btn btn-outline-light btn-sm" href="{{ps5LinksUrl}}">
           <i class="fa-solid fa-link"></i>
           PS5 links
@@ -980,6 +1002,10 @@
           <a class="btn btn-outline-light btn-sm" href="{{ps5sx2Url}}">
             <i class="fa-solid fa-compact-disc"></i>
             PS5SX2
+          </a>
+          <a class="btn btn-outline-light btn-sm" href="{{ps5RetroUrl}}">
+            <i class="fa-solid fa-dice-d20"></i>
+            Retro
           </a>
           <a class="btn btn-outline-light btn-sm" href="{{ps5LinksUrl}}">
             <i class="fa-solid fa-link"></i>

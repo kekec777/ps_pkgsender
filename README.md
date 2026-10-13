@@ -526,3 +526,17 @@ The top-level folder under `/pkg_sender/Retro` is preserved when uploading. Exam
 PS1 files from `/pkg_sender/PS1Games` upload to `/data/homebrew/PPSA99169/ROMS/psx`.
 
 PS5Upload is available from the PS5 Links page instead of the main PS5 subpage navigation.
+
+
+## PS1 library grouping
+
+PS1 games are collected under one PS1 folder on the PS5 library page, even when the local files are stored in separate folders per game for multi-file `.cue` / `.bin` sets. The upload path still keeps the relative file structure under `/data/homebrew/PPSA99169/ROMS/psx`.
+
+
+
+
+## Retro manager page
+
+The Retro manager page is available at `/ps5/retro` and lists installed Retro / PS1 games from `/data/homebrew/PPSA99169/ROMS`. It can delete installed game files through PS5Upload filesystem access.
+
+PS2 games are managed separately with PS5SX2. The PS5 library PS2 button uploads only to `/data/PCSX2/games`.
