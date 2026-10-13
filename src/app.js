@@ -942,6 +942,30 @@ app.post('/api/ps5/ps5sx2/games/delete', express.json(), async (req, res) => {
   }
 });
 
+app.get('/api/ps5/retro/games', async (req, res) => {
+  try {
+    const result = await getRetroRemoteGames({
+      host: req.query.host || req.headers['x-ps5-host']
+    });
+
+    res.json(result);
+  } catch (error) {
+    res.status(400).json({ ok: false, message: error.message });
+  }
+});
+
+app.post('/api/ps5/retro/games/delete', express.json(), async (req, res) => {
+  try {
+    const result = await deleteRetroRemoteGame(req.body?.path || req.body?.remotePath, {
+      host: req.body?.host || req.query.host || req.headers['x-ps5-host']
+    });
+
+    res.json(result);
+  } catch (error) {
+    res.status(400).json({ ok: false, message: error.message });
+  }
+});
+
 app.get('/ps5/payloads', (req, res) => {
   res.type('html').send(renderPs5PayloadPage());
 });
@@ -6123,24 +6147,6 @@ ${renderPs5NavBar('payloads')}
           To make the payload show in <strong>http://${escapeHtml(currentPS5ipadr || 'PS5-IP')}:${ps5PayloadManagerPort}/</strong>,
           this page can also copy it to <strong>${escapeHtml(ps5PayloadManagerRemoteDir)}/&lt;payload&gt;/</strong>
           using PS5Upload filesystem access.
-        </div>
-
-        <div class="help-box">
-          <strong>Quick web UIs:</strong> open tools running directly on the PS5.
-          <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:12px">
-            <a class="btn secondary" id="pldmgrLink" href="${currentPS5ipadr ? `http://${escapeHtml(currentPS5ipadr)}:${ps5PayloadManagerPort}/` : '#'}" target="_blank" rel="noopener">
-              <i class="fa-solid fa-up-right-from-square"></i>
-              Open PLDMGR
-            </a>
-            <a class="btn secondary" id="retroarchLink" href="${currentPS5ipadr ? `http://${escapeHtml(currentPS5ipadr)}:6769/` : '#'}" target="_blank" rel="noopener">
-              <i class="fa-solid fa-up-right-from-square"></i>
-              Open RetroArch WebUI
-            </a>
-            <a class="btn secondary" id="ps5FileWebuiLink" href="${currentPS5ipadr ? `http://${escapeHtml(currentPS5ipadr)}:8888/` : '#'}" target="_blank" rel="noopener">
-              <i class="fa-solid fa-up-right-from-square"></i>
-              Open PS5 File WebUI
-            </a>
-          </div>
         </div>
 
         <label class="checkrow" for="syncPayloadManager">

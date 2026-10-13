@@ -540,3 +540,9 @@ PS1 games are collected under one PS1 folder on the PS5 library page, even when 
 The Retro manager page is available at `/ps5/retro` and lists installed Retro / PS1 games from `/data/homebrew/PPSA99169/ROMS`. It can delete installed game files through PS5Upload filesystem access.
 
 PS2 games are managed separately with PS5SX2. The PS5 library PS2 button uploads only to `/data/PCSX2/games`.
+
+
+## v2.6.3 notes
+
+- The quick web UI buttons were removed from `/ps5/payloads`; use `/ps5/links` instead.
+- Added the missing `/api/ps5/retro/games` and `/api/ps5/retro/games/delete` backend routes used by the Retro manager page.
